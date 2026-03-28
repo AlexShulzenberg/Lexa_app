@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Lexa{% endblock %}</title>
+
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'vocabulary/css/style.css' %}">
+
+    <!-- Chart.js для графиков на странице Progress -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="app-layout">
+
+        <!-- Боковая навигация -->
+        <nav class="sidebar">
+            <div class="sidebar-logo">
+                <span class="logo-text">L</span>
+            </div>
+
+            <ul class="nav-links">
+                <li class="nav-item {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+                    <a href="{% url 'home' %}">
+                        <span class="nav-icon">⌂</span>
+                        <span class="nav-label">Home</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.resolver_match.url_name == 'vocabulary' %}active{% endif %}">
+                    <a href="{% url 'vocabulary' %}">
+                        <span class="nav-icon">📖</span>
+                        <span class="nav-label">Vocabulary</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.resolver_match.url_name == 'progress' %}active{% endif %}">
+                    <a href="{% url 'progress' %}">
+                        <span class="nav-icon">📈</span>
+                        <span class="nav-label">Progress</span>
+                    </a>
+                </li>
+                <li class="nav-item {% if request.resolver_match.url_name == 'collections' %}active{% endif %}">
+                    <a href="{% url 'collections' %}">
+                        <span class="nav-icon">🗂</span>
+                        <span class="nav-label">Collections</span>
+                    </a>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Основной контент -->
+        <main class="main-content">
+            <!-- Сообщения об успехе/ошибках (Django messages framework) -->
+            {% if messages %}
+                <div class="messages-container">
+                    {% for message in messages %}
+                        <div class="message message-{{ message.tags }}">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% block content %}
+            <!-- Сюда подставляется контент каждой страницы -->
+            {% endblock %}
+        </main>
+
+    </div>
+
+    {% load static %}
+    <script src="{% static 'vocabulary/js/main.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+    <!-- extra_js: блок для JS конкретных страниц (например графики на Progress) -->
+</body>
+</html>
