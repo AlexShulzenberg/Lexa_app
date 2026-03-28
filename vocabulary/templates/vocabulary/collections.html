@@ -1,0 +1,48 @@
+{% extends 'vocabulary/base.html' %}
+{% block title %}Lexa — Collections{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-title">Collections</div>
+        <div class="page-subtitle">Organize your words into themed groups</div>
+    </div>
+    <a href="{% url 'collection_add' %}" class="btn btn-primary">+ New collection</a>
+</div>
+
+{% if collections %}
+<div class="collections-grid">
+    {% for col in collections %}
+    <div class="collection-card">
+        <div class="collection-name">{{ col.name }}</div>
+        {% if col.description %}
+        <div class="collection-desc">{{ col.description }}</div>
+        {% endif %}
+        <div class="collection-stats">
+            <span>📚 {{ col.word_count }} words</span>
+            <span>📊 {{ col.mastery_percent }}% mastered</span>
+        </div>
+        <div class="progress-bar-wrap" style="margin-bottom:16px">
+            <div class="progress-bar-fill" style="width: {{ col.mastery_percent }}%"></div>
+        </div>
+        <div class="collection-actions">
+            <a href="{% url 'vocabulary' %}?collection={{ col.id }}" class="btn btn-secondary btn-sm">View words</a>
+            <a href="{% url 'collection_edit' col.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+            <form method="post" action="{% url 'collection_delete' col.pk %}"
+                  onsubmit="return confirm('Delete collection {{ col.name }}?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">🗂</div>
+    <div class="empty-text">No collections yet</div>
+    <div class="empty-sub">Create a collection to organize your words by topic</div>
+    <a href="{% url 'collection_add' %}" class="btn btn-primary">+ Create first collection</a>
+</div>
+{% endif %}
+{% endblock %}

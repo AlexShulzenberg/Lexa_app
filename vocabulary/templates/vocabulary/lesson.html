@@ -1,0 +1,62 @@
+{% extends 'vocabulary/base.html' %}
+{% block title %}Lexa — Lesson{% endblock %}
+
+{% block content %}
+<div class="lesson-container">
+    <!-- Прогресс урока -->
+    <div class="lesson-progress-header">
+        <div class="progress-bar-wrap" style="flex:1">
+            <div class="progress-bar-fill" style="width: {{ progress_percent }}%"></div>
+        </div>
+        <div class="lesson-progress-text">{{ current }} / {{ total }}</div>
+        <a href="{% url 'home' %}" class="btn btn-secondary btn-sm">✕ Exit</a>
+    </div>
+
+    <!-- Карточка слова -->
+    <div class="flashcard" id="flashcard">
+        <div class="flashcard-pos">{{ word.get_part_of_speech_display }}</div>
+        <div class="flashcard-word">{{ word.word }}</div>
+        {% if word.transcription %}
+        <div class="flashcard-transcription">{{ word.transcription }}</div>
+        {% endif %}
+
+        <!-- Ответ скрыт по умолчанию -->
+        <div id="answer" class="answer-hidden">
+            <div class="flashcard-translation">{{ word.translation }}</div>
+            {% if word.example_sentence %}
+            <div class="flashcard-example">{{ word.example_sentence }}</div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Кнопки -->
+    <div id="show-btn-wrap" style="text-align:center">
+        <button class="btn btn-primary btn-large" onclick="showAnswer()">
+            Show answer
+        </button>
+    </div>
+
+    <div id="result-btns" class="lesson-actions" style="display:none">
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="result" value="dont_know">
+            <button type="submit" class="btn-dont-know">✗ Don't know</button>
+        </form>
+        <form method="post">
+            {% csrf_token %}
+            <input type="hidden" name="result" value="know">
+            <button type="submit" class="btn-know">✓ Know it!</button>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function showAnswer() {
+    document.getElementById('answer').classList.remove('answer-hidden');
+    document.getElementById('show-btn-wrap').style.display = 'none';
+    document.getElementById('result-btns').style.display = 'flex';
+}
+</script>
+{% endblock %}

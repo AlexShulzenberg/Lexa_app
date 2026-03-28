@@ -1,0 +1,77 @@
+{% extends 'vocabulary/base.html' %}
+{% block title %}Lexa — Home{% endblock %}
+
+{% block content %}
+<!-- HERO блок -->
+<div class="home-hero">
+    <div>
+        <div class="hero-title">Ready for today's<br>lesson? 🎯</div>
+        <div class="hero-subtitle">
+            {{ new_words }} new words available · {{ words_to_review }} words to review
+        </div>
+        <div class="hero-actions">
+            <a href="{% url 'lesson_start' %}" class="btn btn-primary btn-large">▶ Start lesson</a>
+            <a href="{% url 'vocabulary' %}" class="btn btn-secondary btn-large">Browse words</a>
+        </div>
+    </div>
+    <div class="hero-stats">
+        <div class="hero-stat">
+            <div class="hero-stat-value">{{ streak }}</div>
+            <div class="hero-stat-label">Day streak 🔥</div>
+        </div>
+        <div class="hero-stat">
+            <div class="hero-stat-value">{{ total_words }}</div>
+            <div class="hero-stat-label">Total words</div>
+        </div>
+        <div class="hero-stat">
+            <div class="hero-stat-value">{{ words_to_review }}</div>
+            <div class="hero-stat-label">To review</div>
+        </div>
+    </div>
+</div>
+
+<!-- Нижняя строка: активность + последние слова -->
+<div class="two-col">
+    <!-- Последняя активность -->
+    <div class="card">
+        <div class="section-title">Recent activity</div>
+        {% if recent_sessions %}
+            {% for session in recent_sessions %}
+            <div class="activity-item">
+                <div class="activity-dot"></div>
+                <div>
+                    <div class="activity-text">
+                        Lesson completed — {{ session.words_new }} new, {{ session.words_reviewed }} reviewed
+                    </div>
+                    <div class="activity-sub">{{ session.date }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div class="activity-item">
+                <div class="activity-dot" style="background: var(--text-muted)"></div>
+                <div class="activity-text" style="color: var(--text-muted)">No lessons yet. Start your first one!</div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Последние слова -->
+    <div class="card">
+        <div class="section-title">Recently studied</div>
+        {% if recent_words %}
+            {% for word in recent_words %}
+            <div class="activity-item">
+                <div>
+                    <div class="activity-text">{{ word.word }}</div>
+                    <div class="activity-sub">{{ word.translation }} · <span class="mastery-badge {{ word.mastery_color }}">{{ word.mastery_label }}</span></div>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+            <div style="color: var(--text-muted); font-size: 14px; padding: 12px 0;">
+                Study some words to see them here.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

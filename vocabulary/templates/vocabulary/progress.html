@@ -1,0 +1,159 @@
+{% extends 'vocabulary/base.html' %}
+{% block title %}Lexa — Progress{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div class="page-title">Progress</div>
+</div>
+
+<!-- Ключевые цифры -->
+<div class="stat-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total words</div>
+        <div class="stat-value">{{ total }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">New</div>
+        <div class="stat-value" style="color:var(--mastery-new)">{{ new_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Learning</div>
+        <div class="stat-value warning">{{ learning_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Familiar</div>
+        <div class="stat-value accent">{{ familiar_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Mastered</div>
+        <div class="stat-value success">{{ mastered_count }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Current streak 🔥</div>
+        <div class="stat-value accent">{{ streak }}</div>
+    </div>
+</div>
+
+<!-- График активности -->
+<div class="chart-card">
+    <div class="chart-title">Learning activity</div>
+    <canvas id="activityChart" height="100"></canvas>
+</div>
+
+<!-- Распределение по уровням -->
+<div class="chart-card">
+    <div class="chart-title">Mastery distribution</div>
+    {% if total > 0 %}
+    <div class="mastery-distribution">
+        {% if new_count > 0 %}
+        <div class="mastery-segment"
+             style="flex:{{ new_count }};background:var(--mastery-new)"
+             title="New: {{ new_count }}"></div>
+        {% endif %}
+        {% if learning_count > 0 %}
+        <div class="mastery-segment"
+             style="flex:{{ learning_count }};background:var(--mastery-learning)"
+             title="Learning: {{ learning_count }}"></div>
+        {% endif %}
+        {% if familiar_count > 0 %}
+        <div class="mastery-segment"
+             style="flex:{{ familiar_count }};background:var(--mastery-familiar)"
+             title="Familiar: {{ familiar_count }}"></div>
+        {% endif %}
+        {% if mastered_count > 0 %}
+        <div class="mastery-segment"
+             style="flex:{{ mastered_count }};background:var(--mastery-mastered)"
+             title="Mastered: {{ mastered_count }}"></div>
+        {% endif %}
+    </div>
+    <div class="mastery-legend">
+        <div class="legend-item">
+            <div class="legend-dot" style="background:var(--mastery-new)"></div>
+            New ({{ new_count }})
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background:var(--mastery-learning)"></div>
+            Learning ({{ learning_count }})
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background:var(--mastery-familiar)"></div>
+            Familiar ({{ familiar_count }})
+        </div>
+        <div class="legend-item">
+            <div class="legend-dot" style="background:var(--mastery-mastered)"></div>
+            Mastered ({{ mastered_count }})
+        </div>
+    </div>
+    {% else %}
+    <div style="color:var(--text-muted);font-size:14px">No words yet.</div>
+    {% endif %}
+</div>
+
+<!-- Последние слова -->
+{% if recent_words %}
+<div class="chart-card">
+    <div class="chart-title">Recently studied words</div>
+    <table class="recent-table">
+        <thead>
+            <tr>
+                <th>Word</th>
+                <th>Translation</th>
+                <th>Level</th>
+                <th>Last studied</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for word in recent_words %}
+            <tr>
+                <td><strong>{{ word.word }}</strong></td>
+                <td>{{ word.translation }}</td>
+                <td><span class="mastery-badge {{ word.mastery_color }}">{{ word.mastery_label }}</span></td>
+                <td style="color:var(--text-muted)">{{ word.last_reviewed|date:"M d, H:i" }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script id="chart-data" type="application/json">{{ chart_data_json }}</script>
+<script>
+const rawData = JSON.parse(document.getElementById('chart-data').textContent);
+
+const ctx = document.getElementById('activityChart').getContext('2d');
+new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: rawData.labels.length ? rawData.labels : ['No data yet'],
+        datasets: [
+            {
+                label: 'New words',
+                data: rawData.new_words.length ? rawData.new_words : [0],
+                backgroundColor: 'rgba(79, 110, 247, 0.7)',
+                borderRadius: 4,
+            },
+            {
+                label: 'Reviewed',
+                data: rawData.reviewed_words.length ? rawData.reviewed_words : [0],
+                backgroundColor: 'rgba(62, 207, 142, 0.6)',
+                borderRadius: 4,
+            }
+        ]
+    },
+    options: {
+        responsive: true,
+        plugins: {
+            legend: {
+                labels: { color: '#8b90a7' }
+            }
+        },
+        scales: {
+            x: { ticks: { color: '#8b90a7' }, grid: { color: '#2a2d3e' } },
+            y: { ticks: { color: '#8b90a7' }, grid: { color: '#2a2d3e' } }
+        }
+    }
+});
+</script>
+{% endblock %}

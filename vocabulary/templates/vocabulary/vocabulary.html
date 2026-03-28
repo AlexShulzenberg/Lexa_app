@@ -1,0 +1,84 @@
+{% extends 'vocabulary/base.html' %}
+{% block title %}Lexa — Vocabulary{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-title">Vocabulary</div>
+        <div class="page-subtitle">All words you've added to your dictionary</div>
+    </div>
+    <a href="{% url 'word_add' %}" class="btn btn-primary">+ Add word</a>
+</div>
+
+<!-- Фильтры и поиск -->
+<div class="filter-bar">
+    <a href="{% url 'vocabulary' %}" class="filter-btn {% if not mastery_filter %}active{% endif %}">All</a>
+    <a href="?mastery=new{% if collection_filter %}&collection={{ collection_filter }}{% endif %}"
+       class="filter-btn {% if mastery_filter == 'new' %}active{% endif %}">New</a>
+    <a href="?mastery=learning{% if collection_filter %}&collection={{ collection_filter }}{% endif %}"
+       class="filter-btn {% if mastery_filter == 'learning' %}active{% endif %}">Learning</a>
+    <a href="?mastery=familiar{% if collection_filter %}&collection={{ collection_filter }}{% endif %}"
+       class="filter-btn {% if mastery_filter == 'familiar' %}active{% endif %}">Familiar</a>
+    <a href="?mastery=mastered{% if collection_filter %}&collection={{ collection_filter }}{% endif %}"
+       class="filter-btn {% if mastery_filter == 'mastered' %}active{% endif %}">Mastered</a>
+
+    <!-- Фильтр по коллекции -->
+    {% if collections %}
+    <select onchange="window.location='?collection='+this.value+'{% if mastery_filter %}&mastery={{ mastery_filter }}{% endif %}'"
+            style="background:var(--bg-card);border:1px solid var(--border);border-radius:20px;color:var(--text-secondary);padding:8px 14px;font-size:13px;cursor:pointer">
+        <option value="">All collections</option>
+        {% for col in collections %}
+        <option value="{{ col.id }}" {% if collection_filter == col.id|stringformat:"s" %}selected{% endif %}>
+            {{ col.name }}
+        </option>
+        {% endfor %}
+    </select>
+    {% endif %}
+
+    <!-- Поиск -->
+    <form method="get" style="margin-left: auto">
+        {% if mastery_filter %}<input type="hidden" name="mastery" value="{{ mastery_filter }}">{% endif %}
+        {% if collection_filter %}<input type="hidden" name="collection" value="{{ collection_filter }}">{% endif %}
+        <input type="text" name="search" value="{{ search_query }}"
+               placeholder="🔍 Search words..." class="search-input">
+    </form>
+</div>
+
+<!-- Список слов -->
+{% if words %}
+<div class="word-list">
+    {% for word in words %}
+    <div class="word-card">
+        <div class="word-main">
+            <div class="word-text">{{ word.word }}</div>
+            <div class="word-meta">
+                {% if word.transcription %}{{ word.transcription }} · {% endif %}
+                {{ word.get_part_of_speech_display }}
+                {% if word.collection %} · {{ word.collection.name }}{% endif %}
+            </div>
+        </div>
+        <div class="word-translation">{{ word.translation }}</div>
+        {% if word.example_sentence %}
+        <div class="word-example">{{ word.example_sentence }}</div>
+        {% endif %}
+        <span class="mastery-badge {{ word.mastery_color }}">{{ word.mastery_label }}</span>
+        <div class="word-actions">
+            <a href="{% url 'word_edit' word.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+            <form method="post" action="{% url 'word_delete' word.pk %}"
+                  onsubmit="return confirm('Delete {{ word.word }}?')">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+            </form>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="empty-state">
+    <div class="empty-icon">📚</div>
+    <div class="empty-text">No words found</div>
+    <div class="empty-sub">Try changing the filter or add your first word</div>
+    <a href="{% url 'word_add' %}" class="btn btn-primary">+ Add first word</a>
+</div>
+{% endif %}
+{% endblock %}
