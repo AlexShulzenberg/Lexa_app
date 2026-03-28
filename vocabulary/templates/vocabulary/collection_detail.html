@@ -1,0 +1,107 @@
+{% extends 'vocabulary/base.html' %}
+{% block title %}Lexa — {{ collection.name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-title">{{ collection.name }}</div>
+        <div class="page-subtitle">
+            {{ collection.description }}
+            · {{ collection.word_count }} words · {{ collection.mastery_percent }}% mastered
+        </div>
+    </div>
+    <div style="display:flex;gap:10px">
+        <a href="{% url 'word_add' %}?collection={{ collection.pk }}"
+           class="btn btn-primary">+ Add new word</a>
+        <a href="{% url 'collections' %}" class="btn btn-secondary">← Collections</a>
+    </div>
+</div>
+
+<!-- Прогресс коллекции -->
+<div class="card" style="margin-bottom:24px">
+    <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" style="width:{{ collection.mastery_percent }}%"></div>
+    </div>
+    <div style="font-size:12px;color:var(--text-muted);margin-top:8px">
+        {{ collection.mastery_percent }}% mastered
+    </div>
+</div>
+
+<div style="display:grid;grid-template-columns:2fr 1fr;gap:24px">
+
+    <!-- Левая колонка: слова в коллекции -->
+    <div>
+        <div class="section-title" style="margin-bottom:16px">
+            Words in this collection ({{ words_in.count }})
+        </div>
+        {% if words_in %}
+            <div class="word-list">
+                {% for word in words_in %}
+                <div class="word-card">
+                    <div class="word-main">
+                        <div class="word-text">{{ word.word }}</div>
+                        <div class="word-meta">
+                            {% if word.transcription %}{{ word.transcription }} · {% endif %}
+                            {{ word.get_part_of_speech_display }}
+                        </div>
+                    </div>
+                    <div class="word-translation">{{ word.translation }}</div>
+                    <span class="mastery-badge {{ word.mastery_color }}">{{ word.mastery_label }}</span>
+                    <div class="word-actions" style="opacity:1">
+                        <a href="{% url 'word_edit' word.pk %}" class="btn btn-secondary btn-sm">Edit</a>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="detach">
+                            <input type="hidden" name="word_id" value="{{ word.pk }}">
+                            <button type="submit" class="btn btn-secondary btn-sm"
+                                    title="Remove from collection">✕</button>
+                        </form>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state" style="padding:40px 0">
+                <div class="empty-icon">📭</div>
+                <div class="empty-text">No words yet</div>
+                <div class="empty-sub">Add new words or attach existing ones</div>
+                <a href="{% url 'word_add' %}?collection={{ collection.pk }}"
+                   class="btn btn-primary">+ Add first word</a>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Правая колонка: прикрепить слово из словаря -->
+    <div>
+        <div class="section-title" style="margin-bottom:16px">
+            Add from vocabulary ({{ words_available.count }})
+        </div>
+        {% if words_available %}
+        <div class="card" style="max-height:500px;overflow-y:auto">
+            {% for word in words_available %}
+            <div style="display:flex;align-items:center;justify-content:space-between;
+                        padding:10px 0;border-bottom:1px solid var(--border)">
+                <div>
+                    <div style="font-size:14px;font-weight:600">{{ word.word }}</div>
+                    <div style="font-size:12px;color:var(--text-muted)">{{ word.translation }}</div>
+                </div>
+                <form method="post">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="attach">
+                    <input type="hidden" name="word_id" value="{{ word.pk }}">
+                    <button type="submit" class="btn btn-secondary btn-sm">+ Add</button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="card">
+            <div style="color:var(--text-muted);font-size:14px;text-align:center;padding:20px">
+                All words are already in this collection
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

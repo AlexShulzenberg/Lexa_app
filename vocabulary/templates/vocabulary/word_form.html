@@ -6,28 +6,32 @@
     <div>
         <div class="page-title">{{ action }} word</div>
         <div class="page-subtitle">
-            {% if action == 'Add' %}Add a new word to your vocabulary{% else %}Edit word details{% endif %}
+            {% if action == 'Add' %}Add a French word to your vocabulary{% else %}Edit word details{% endif %}
         </div>
     </div>
-    <a href="{% url 'vocabulary' %}" class="btn btn-secondary">← Back</a>
+    <a href="{% if from_collection %}{% url 'collection_detail' from_collection %}{% else %}{% url 'vocabulary' %}{% endif %}"
+       class="btn btn-secondary">← Back</a>
 </div>
 
 <div class="form-card">
     <form method="post">
         {% csrf_token %}
+        {% if from_collection %}
+            <input type="hidden" name="from_collection" value="{{ from_collection }}">
+        {% endif %}
 
         <div class="form-row">
             <div class="form-group">
-                <label class="form-label">Word *</label>
+                <label class="form-label">French word *</label>
                 {{ form.word }}
                 {% if form.word.errors %}
                     <div class="field-error">{{ form.word.errors.0 }}</div>
                 {% endif %}
             </div>
             <div class="form-group">
-                <label class="form-label">Translation *</label>
+                <label class="form-label">Translation (RU) *</label>
                 {{ form.translation }}
-                <button type="button" class="translate-btn" onclick="autoTranslate()">
+                <button type="button" class="translate-btn" id="translate-btn" onclick="autoTranslate()">
                     ⚡ Auto-translate
                 </button>
                 {% if form.translation.errors %}
@@ -40,6 +44,7 @@
             <div class="form-group">
                 <label class="form-label">Transcription</label>
                 {{ form.transcription }}
+                <span style="font-size:11px;color:var(--text-muted)">Fill manually, e.g. /ʃa/</span>
             </div>
             <div class="form-group">
                 <label class="form-label">Part of speech</label>
@@ -61,7 +66,8 @@
             <button type="submit" class="btn btn-primary">
                 {% if action == 'Add' %}Add word{% else %}Save changes{% endif %}
             </button>
-            <a href="{% url 'vocabulary' %}" class="btn btn-secondary">Cancel</a>
+            <a href="{% if from_collection %}{% url 'collection_detail' from_collection %}{% else %}{% url 'vocabulary' %}{% endif %}"
+               class="btn btn-secondary">Cancel</a>
         </div>
     </form>
 </div>
@@ -69,30 +75,62 @@
 
 {% block extra_js %}
 <script>
-// Автоперевод через наш API
+const POS_MAP = {
+    'v': 'v', 'n': 'n', 'adj': 'adj', 'adv': 'adv',
+    'phrase': 'phrase', 'other': 'other'
+};
+
 function autoTranslate() {
-    const wordInput = document.querySelector('.form-input');
-    const word = wordInput ? wordInput.value.trim() : '';
+    const wordField = document.getElementById('id_word');
+    const word = wordField ? wordField.value.trim() : '';
     if (!word) {
-        alert('Enter a word first!');
+        alert('Enter a French word first!');
         return;
     }
-    const btn = document.querySelector('.translate-btn');
+    const btn = document.getElementById('translate-btn');
     btn.textContent = '⏳ Translating...';
+    btn.disabled = true;
 
     fetch(`/api/translate/?word=${encodeURIComponent(word)}`)
         .then(res => res.json())
         .then(data => {
+            // Перевод
             if (data.translation) {
                 document.getElementById('id_translation').value = data.translation;
-                btn.textContent = '✓ Translated!';
-                setTimeout(() => btn.textContent = '⚡ Auto-translate', 2000);
-            } else {
-                btn.textContent = '✗ Failed, try again';
             }
+
+            // Транскрипция
+            if (data.transcription) {
+                document.getElementById('id_transcription').value = data.transcription;
+            }
+
+            // Пример предложения (ДОБАВЛЯЕМ ЭТО)
+            if (data.example_sentence) {
+                const exampleField = document.getElementById('id_example_sentence');
+                if (exampleField) {
+                    exampleField.value = data.example_sentence;
+                  }
+             }
+
+
+            // Часть речи
+            if (data.part_of_speech) {
+                const posSelect = document.getElementById('id_part_of_speech');
+                if (posSelect && POS_MAP[data.part_of_speech]) {
+                    posSelect.value = POS_MAP[data.part_of_speech];
+                }
+            }
+
+            const ok = data.translation && !data.error;
+            btn.textContent = ok ? '✓ Done!' : '✗ Not found';
+            setTimeout(() => {
+                btn.textContent = '⚡ Auto-translate';
+                btn.disabled = false;
+            }, 2000);
         })
         .catch(() => {
             btn.textContent = '✗ Error';
+            btn.disabled = false;
         });
 }
 </script>

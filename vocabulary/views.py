@@ -11,6 +11,9 @@ from django.http import JsonResponse
 from django.utils import timezone
 from .models import Word, Collection, LessonSession, DailyStreak
 from .forms import WordForm, CollectionForm
+from django.conf import settings
+from google import genai
+from google.genai import types
 
 
 # ─────────────────────────────────────────────
@@ -94,18 +97,26 @@ def vocabulary_list(request):
 
 def word_add(request):
     """Форма добавления нового слова."""
+    from_collection = request.GET.get('collection') or request.POST.get('from_collection')
+
     if request.method == 'POST':
         form = WordForm(request.POST)
         if form.is_valid():
             form.save()
             messages.success(request, 'Word added successfully!')
+            if from_collection:
+                return redirect('collection_detail', pk=from_collection)
             return redirect('vocabulary')
     else:
-        form = WordForm()
+        initial = {}
+        if from_collection:
+            initial['collection'] = from_collection
+        form = WordForm(initial=initial)
 
     return render(request, 'vocabulary/word_form.html', {
         'form': form,
         'action': 'Add',
+        'from_collection': from_collection,
     })
 
 
@@ -151,6 +162,46 @@ def collections(request):
         'collections': all_collections,
     }
     return render(request, 'vocabulary/collections.html', context)
+
+
+def collection_detail(request, pk):
+    """
+    Страница конкретной коллекции.
+    Показывает слова коллекции, позволяет добавить новое слово
+    или прикрепить уже существующее из словаря.
+    """
+    collection = get_object_or_404(Collection, pk=pk)
+    words_in = Word.objects.filter(collection=collection)
+    # Слова которых ещё нет в этой коллекции — для прикрепления
+    words_available = Word.objects.exclude(collection=collection)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+
+        if action == 'attach':
+            # Прикрепить существующее слово к коллекции
+            word_id = request.POST.get('word_id')
+            word = get_object_or_404(Word, pk=word_id)
+            word.collection = collection
+            word.save()
+            messages.success(request, f'"{word.word}" added to {collection.name}!')
+
+        elif action == 'detach':
+            # Открепить слово от коллекции
+            word_id = request.POST.get('word_id')
+            word = get_object_or_404(Word, pk=word_id)
+            word.collection = None
+            word.save()
+            messages.success(request, f'"{word.word}" removed from collection.')
+
+        return redirect('collection_detail', pk=pk)
+
+    context = {
+        'collection': collection,
+        'words_in': words_in,
+        'words_available': words_available,
+    }
+    return render(request, 'vocabulary/collection_detail.html', context)
 
 
 def collection_add(request):
@@ -364,19 +415,45 @@ def lesson_complete(request):
 
 def translate_word(request):
     """
-    API-эндпоинт для перевода слова через MyMemory API.
-    Вызывается из JavaScript (fetch) на странице добавления слова.
-    Возвращает JSON.
+    Переводит французское слово на русский, определяет часть речи 
+    и транскрипцию с помощью Gemini API.
     """
-    word = request.GET.get('word', '')
+    word = request.GET.get('word', '').strip()
     if not word:
         return JsonResponse({'error': 'No word provided'}, status=400)
 
+    # Получаем ключ из settings.py
+    api_key = getattr(settings, 'GEMINI_API_KEY', None)
+    if not api_key:
+        return JsonResponse({'error': 'Gemini API key is missing in settings'}, status=500)
+
+    # Инициализируем клиент
+    client = genai.Client(api_key=api_key)
+
+    # Пишем четкий промпт (инструкцию) для ИИ
+    prompt = f"""
+    Проанализируй французское слово "{word}".
+    Верни результат со следующими данными:
+    1. translation: точный перевод на русский язык.
+    2. transcription: фонетическая транскрипция IPA (например, /e.ku.te/).
+    3. part_of_speech: часть речи ('n', 'v', 'adj', 'adv', 'phrase', 'other').
+    4. example_sentence: один короткий, естественный пример использования этого слова в предложении на французском языке.
+    """
+
     try:
-        url = f"https://api.mymemory.translated.net/get?q={word}&langpair=en|ru"
-        response = requests.get(url, timeout=5)
-        data = response.json()
-        translation = data['responseData']['translatedText']
-        return JsonResponse({'translation': translation})
-    except Exception:
-        return JsonResponse({'error': 'Translation failed'}, status=500)
+        response = client.models.generate_content(
+            model='gemini-2.5-flash', # Убедись, что версия модели актуальна для твоего региона/API
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+            ),
+        )
+        
+        result = json.loads(response.text)
+        # Теперь в словаре result будет ключ 'example_sentence'
+        return JsonResponse(result)
+    
+    except Exception as e:
+        # Это выведет полную ошибку в консоль VS Code (черное окно внизу)
+        print(f"--- Gemini Error: {e} ---") 
+        return JsonResponse({'error': str(e)}, status=500)

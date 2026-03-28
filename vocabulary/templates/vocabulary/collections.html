@@ -26,7 +26,7 @@
             <div class="progress-bar-fill" style="width: {{ col.mastery_percent }}%"></div>
         </div>
         <div class="collection-actions">
-            <a href="{% url 'vocabulary' %}?collection={{ col.id }}" class="btn btn-secondary btn-sm">View words</a>
+            <a href="{% url 'collection_detail' col.pk %}" class="btn btn-primary btn-sm">Open</a>
             <a href="{% url 'collection_edit' col.pk %}" class="btn btn-secondary btn-sm">Edit</a>
             <form method="post" action="{% url 'collection_delete' col.pk %}"
                   onsubmit="return confirm('Delete collection {{ col.name }}?')">
