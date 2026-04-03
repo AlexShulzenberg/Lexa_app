@@ -3,60 +3,228 @@
 
 {% block content %}
 <div class="lesson-container">
-    <!-- Прогресс урока -->
-    <div class="lesson-progress-header">
-        <div class="progress-bar-wrap" style="flex:1">
-            <div class="progress-bar-fill" style="width: {{ progress_percent }}%"></div>
-        </div>
-        <div class="lesson-progress-text">{{ current }} / {{ total }}</div>
-        <a href="{% url 'home' %}" class="btn btn-secondary btn-sm">✕ Exit</a>
-    </div>
 
-    <!-- Карточка слова -->
-    <div class="flashcard" id="flashcard">
-        <div class="flashcard-pos">{{ word.get_part_of_speech_display }}</div>
-        <div class="flashcard-word">{{ word.word }}</div>
-        {% if word.transcription %}
-        <div class="flashcard-transcription">{{ word.transcription }}</div>
-        {% endif %}
-
-        <!-- Ответ скрыт по умолчанию -->
-        <div id="answer" class="answer-hidden">
-            <div class="flashcard-translation">{{ word.translation }}</div>
-            {% if word.example_sentence %}
-            <div class="flashcard-example">{{ word.example_sentence }}</div>
-            {% endif %}
-        </div>
+  <!-- Прогресс-бар -->
+  <div class="lesson-progress-header">
+    <div class="progress-bar-wrap" style="flex:1">
+      <div class="progress-bar-fill" style="width:{{ progress }}%"></div>
     </div>
+    <div class="lesson-progress-text">{{ current }} / {{ total }}</div>
+    <a href="{% url 'home' %}" class="btn btn-secondary btn-sm"
+       onclick="return confirm('Exit lesson? Progress will be saved.')">✕ Exit</a>
+  </div>
 
-    <!-- Кнопки -->
-    <div id="show-btn-wrap" style="text-align:center">
-        <button class="btn btn-primary btn-large" onclick="showAnswer()">
-            Show answer
-        </button>
-    </div>
+  <!-- ═══════════════════════════════════════════════════
+       ФАЗА 1: ПРЕЗЕНТАЦИЯ
+  ══════════════════════════════════════════════════════ -->
+  {% if step.phase == 'presentation' %}
+  <div class="lesson-label">New word</div>
+  <div class="flashcard flashcard--presentation">
+    <div class="flashcard-word">{{ word.word }}</div>
+    {% if word.transcription %}
+      <div class="flashcard-transcription">{{ word.transcription }}</div>
+    {% endif %}
+    <span class="flashcard-pos">{{ word.get_part_of_speech_display }}</span>
+    <div class="flashcard-divider"></div>
+    <div class="flashcard-translation">{{ word.translation }}</div>
+    {% if word.example_sentence %}
+      <div class="flashcard-example">{{ word.example_sentence }}</div>
+    {% endif %}
+  </div>
+  <form method="post" style="text-align:center">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-primary btn-large">Continue →</button>
+  </form>
 
-    <div id="result-btns" class="lesson-actions" style="display:none">
-        <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="result" value="dont_know">
-            <button type="submit" class="btn-dont-know">✗ Don't know</button>
-        </form>
-        <form method="post">
-            {% csrf_token %}
-            <input type="hidden" name="result" value="know">
-            <button type="submit" class="btn-know">✓ Know it!</button>
-        </form>
+  <!-- ═══════════════════════════════════════════════════
+       FEEDBACK после ответа
+  ══════════════════════════════════════════════════════ -->
+  {% elif feedback %}
+  <div class="feedback-card {% if correct %}feedback-correct{% else %}feedback-wrong{% endif %}">
+    <div class="feedback-icon">{% if correct %}✓{% else %}✗{% endif %}</div>
+    <div class="feedback-title">{% if correct %}Correct!{% else %}Not quite{% endif %}</div>
+    {% if not correct %}
+      <div class="feedback-answer">
+        Correct answer: <strong>{{ correct_answer }}</strong>
+      </div>
+    {% endif %}
+    <div class="feedback-word-info">
+      <span class="feedback-word">{{ word.word }}</span>
+      <span class="feedback-sep">→</span>
+      <span class="feedback-translation">{{ word.translation }}</span>
     </div>
+    {% if word.example_sentence %}
+      <div class="feedback-example">{{ word.example_sentence }}</div>
+    {% endif %}
+  </div>
+  <form method="post" style="text-align:center">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="next">
+    <button type="submit" class="btn btn-primary btn-large">Continue →</button>
+  </form>
+
+  <!-- ═══════════════════════════════════════════════════
+       ПРАКТИКА: ТИП 1 — FR → RU (ввод перевода)
+  ══════════════════════════════════════════════════════ -->
+  {% elif step.phase == 'practice' and step.type == 1 %}
+  <div class="lesson-label">Translate to Russian</div>
+  <div class="flashcard flashcard--practice">
+    <div class="flashcard-word">{{ word.word }}</div>
+    {% if word.transcription %}
+      <div class="flashcard-transcription">{{ word.transcription }}</div>
+    {% endif %}
+    <span class="flashcard-pos">{{ word.get_part_of_speech_display }}</span>
+  </div>
+  <form method="post" class="practice-form" id="answer-form">
+    {% csrf_token %}
+    <div class="input-group">
+      <input type="text"
+             name="answer"
+             id="answer-input"
+             class="practice-input"
+             placeholder="Type Russian translation..."
+             autocomplete="off"
+             autofocus>
+      <button type="submit" class="btn btn-primary">Check →</button>
+    </div>
+    <div class="input-hint">Press Enter to submit</div>
+  </form>
+
+  <!-- ═══════════════════════════════════════════════════
+       ПРАКТИКА: ТИП 2 — RU → FR (ввод французского)
+  ══════════════════════════════════════════════════════ -->
+  {% elif step.phase == 'practice' and step.type == 2 %}
+  <div class="lesson-label">Translate to French</div>
+  <div class="flashcard flashcard--practice">
+    <div class="flashcard-word" style="font-size:32px">{{ word.translation }}</div>
+    <span class="flashcard-pos">{{ word.get_part_of_speech_display }}</span>
+  </div>
+  <form method="post" class="practice-form" id="answer-form">
+    {% csrf_token %}
+    <div class="input-group">
+      <input type="text"
+             name="answer"
+             id="answer-input"
+             class="practice-input"
+             placeholder="Type French word..."
+             autocomplete="off"
+             autofocus>
+      <button type="submit" class="btn btn-primary">Check →</button>
+    </div>
+    <div class="input-hint">Press Enter to submit</div>
+  </form>
+
+  <!-- ═══════════════════════════════════════════════════
+       ПРАКТИКА: ТИП 3 — FILL-IN-THE-BLANK
+  ══════════════════════════════════════════════════════ -->
+  {% elif step.phase == 'practice' and step.type == 3 %}
+  <div class="lesson-label">Fill in the blank</div>
+  <div class="flashcard flashcard--blank">
+    <div class="blank-sentence">{{ blank_sentence }}</div>
+    <div class="blank-hint">Choose the correct word:</div>
+  </div>
+  <form method="post" id="blank-form">
+    {% csrf_token %}
+    <input type="hidden" name="answer" id="blank-answer">
+    <div class="choices-grid">
+      {% for choice_word in choice_words %}
+      <button type="button"
+              class="choice-btn"
+              onclick="selectChoice(this, '{{ choice_word.id }}')">
+        {{ choice_word.word }}
+        <span class="choice-sub">{{ choice_word.translation }}</span>
+      </button>
+      {% endfor %}
+    </div>
+  </form>
+
+  <!-- ═══════════════════════════════════════════════════
+       ПРАКТИКА: ТИП 4 — MATCHING
+  ══════════════════════════════════════════════════════ -->
+  {% elif step.phase == 'practice' and step.type == 4 %}
+  <div class="lesson-label">Match the pairs</div>
+  <div class="matching-container">
+    <div class="matching-col">
+      {% for pw in pair_words %}
+      <button class="match-btn match-fr" data-id="{{ pw.id }}" onclick="selectMatch(this, 'fr')">
+        {{ pw.word }}
+      </button>
+      {% endfor %}
+    </div>
+    <div class="matching-arrow">↔</div>
+    <div class="matching-col">
+      {% for rw in ru_words %}
+      <button class="match-btn match-ru" data-id="{{ rw.id }}" onclick="selectMatch(this, 'ru')">
+        {{ rw.translation }}
+      </button>
+      {% endfor %}
+    </div>
+  </div>
+  <form method="post" id="matching-form" style="text-align:center;margin-top:24px">
+    {% csrf_token %}
+    <input type="hidden" name="answer" id="matching-answer">
+    <button type="submit" id="matching-submit" class="btn btn-primary btn-large" disabled>
+      Check →
+    </button>
+  </form>
+
+  {% endif %}
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-function showAnswer() {
-    document.getElementById('answer').classList.remove('answer-hidden');
-    document.getElementById('show-btn-wrap').style.display = 'none';
-    document.getElementById('result-btns').style.display = 'flex';
+// ── Тип 1 и 2: отправка по Enter ─────────────────────
+const answerForm = document.getElementById('answer-form');
+if (answerForm) {
+  document.getElementById('answer-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') { e.preventDefault(); answerForm.submit(); }
+  });
+}
+
+// ── Тип 3: выбор варианта ─────────────────────────────
+function selectChoice(btn, wordId) {
+  document.querySelectorAll('.choice-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  document.getElementById('blank-answer').value = wordId;
+  setTimeout(() => document.getElementById('blank-form').submit(), 300);
+}
+
+// ── Тип 4: matching ───────────────────────────────────
+let selectedFr = null;
+let selectedRu = null;
+const pairs = {};  // {fr_id: ru_id}
+
+function selectMatch(btn, side) {
+  if (side === 'fr') {
+    document.querySelectorAll('.match-fr').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedFr = btn.dataset.id;
+  } else {
+    document.querySelectorAll('.match-ru').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedRu = btn.dataset.id;
+  }
+
+  if (selectedFr && selectedRu) {
+    // Создаём пару
+    pairs[selectedFr] = selectedRu;
+
+    // Подсвечиваем совпадение
+    document.querySelector(`.match-fr[data-id="${selectedFr}"]`).classList.add('matched');
+    document.querySelector(`.match-ru[data-id="${selectedRu}"]`).classList.add('matched');
+
+    selectedFr = null;
+    selectedRu = null;
+
+    // Если все пары собраны — активируем кнопку
+    const totalPairs = document.querySelectorAll('.match-fr').length;
+    if (Object.keys(pairs).length >= totalPairs) {
+      document.getElementById('matching-answer').value = JSON.stringify(pairs);
+      document.getElementById('matching-submit').disabled = false;
+    }
+  }
 }
 </script>
 {% endblock %}

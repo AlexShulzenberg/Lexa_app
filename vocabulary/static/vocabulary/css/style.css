@@ -908,3 +908,228 @@ a {
     background: var(--border-light);
     border-radius: 4px;
 }
+
+/* ─── LESSON NEW STYLES ──────────────────────────────── */
+.lesson-label {
+    text-align: center;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-muted);
+    margin-bottom: 16px;
+}
+
+.flashcard--presentation {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px var(--accent-light);
+}
+
+.flashcard--practice {
+    min-height: 180px;
+    padding: 32px;
+}
+
+.flashcard--blank {
+    min-height: 160px;
+    gap: 20px;
+}
+
+.flashcard-divider {
+    width: 60px;
+    height: 1px;
+    background: var(--border);
+    margin: 4px 0;
+}
+
+.blank-sentence {
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text-primary);
+    line-height: 1.6;
+    text-align: center;
+}
+
+.blank-hint {
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+/* ─── PRACTICE INPUT ─────────────────────────────────── */
+.practice-form {
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.input-group {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.practice-input {
+    flex: 1;
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 14px 18px;
+    font-size: 16px;
+    transition: border-color 0.2s;
+}
+
+.practice-input:focus {
+    outline: none;
+    border-color: var(--accent);
+}
+
+.input-hint {
+    font-size: 12px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+/* ─── CHOICES (Type 3) ───────────────────────────────── */
+.choices-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    max-width: 540px;
+    margin: 0 auto;
+}
+
+.choice-btn {
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-primary);
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+}
+
+.choice-btn:hover {
+    border-color: var(--accent);
+    background: var(--accent-light);
+}
+
+.choice-btn.selected {
+    border-color: var(--accent);
+    background: var(--accent-light);
+    transform: scale(0.97);
+}
+
+.choice-sub {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 400;
+}
+
+/* ─── MATCHING (Type 4) ──────────────────────────────── */
+.matching-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 0 auto;
+    max-width: 640px;
+}
+
+.matching-col {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    flex: 1;
+}
+
+.matching-arrow {
+    font-size: 24px;
+    color: var(--text-muted);
+}
+
+.match-btn {
+    background: var(--bg-card);
+    border: 2px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 14px 16px;
+    font-size: 15px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-align: center;
+}
+
+.match-btn:hover { border-color: var(--accent); }
+.match-btn.active { border-color: var(--accent); background: var(--accent-light); }
+.match-btn.matched {
+    border-color: var(--success);
+    background: rgba(62, 207, 142, 0.1);
+    color: var(--success);
+    cursor: default;
+    pointer-events: none;
+}
+
+/* ─── FEEDBACK ───────────────────────────────────────── */
+.feedback-card {
+    border-radius: 20px;
+    padding: 36px;
+    text-align: center;
+    margin-bottom: 24px;
+    border: 2px solid;
+}
+
+.feedback-correct {
+    background: rgba(62, 207, 142, 0.08);
+    border-color: var(--success);
+}
+
+.feedback-wrong {
+    background: rgba(240, 82, 82, 0.08);
+    border-color: var(--danger);
+}
+
+.feedback-icon {
+    font-size: 48px;
+    margin-bottom: 8px;
+}
+
+.feedback-correct .feedback-icon { color: var(--success); }
+.feedback-wrong .feedback-icon { color: var(--danger); }
+
+.feedback-title {
+    font-size: 22px;
+    font-weight: 700;
+    margin-bottom: 12px;
+}
+
+.feedback-answer {
+    font-size: 16px;
+    color: var(--text-secondary);
+    margin-bottom: 16px;
+}
+
+.feedback-word-info {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    font-size: 18px;
+    margin-bottom: 12px;
+}
+
+.feedback-word { font-weight: 700; }
+.feedback-sep { color: var(--text-muted); }
+.feedback-translation { color: var(--text-secondary); }
+
+.feedback-example {
+    font-size: 14px;
+    color: var(--text-muted);
+    font-style: italic;
+    margin-top: 8px;
+}

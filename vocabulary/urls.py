@@ -31,7 +31,7 @@ urlpatterns = [
 
     # --- Урок ---
     path('lesson/', views.lesson_start, name='lesson_start'),
-    path('lesson/card/', views.lesson_card, name='lesson_card'),
+    path('lesson/step/', views.lesson_step, name='lesson_step'),
     path('lesson/complete/', views.lesson_complete, name='lesson_complete'),
 
     # --- API для перевода (вызывается из JS) ---
