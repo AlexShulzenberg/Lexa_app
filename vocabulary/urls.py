@@ -28,6 +28,7 @@ urlpatterns = [
     path('collection/<int:pk>/edit/', views.collection_edit, name='collection_edit'),
     path('collection/<int:pk>/delete/', views.collection_delete, name='collection_delete'),
     path('collection/<int:pk>/', views.collection_detail, name='collection_detail'),
+    path('collection/import/', views.collection_import, name='collection_import'),
 
     # --- Урок ---
     path('lesson/', views.lesson_start, name='lesson_start'),

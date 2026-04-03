@@ -1,0 +1,162 @@
+{% extends 'vocabulary/base.html' %}
+{% block title %}Lexa — Import Collection{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <div class="page-title">Import collection</div>
+        <div class="page-subtitle">Upload a JSON file to add a whole collection at once</div>
+    </div>
+    <a href="{% url 'collections' %}" class="btn btn-secondary">← Back</a>
+</div>
+
+<div style="max-width:640px">
+
+    <!-- Зона загрузки -->
+    <form method="post" enctype="multipart/form-data" id="import-form">
+        {% csrf_token %}
+        <div class="drop-zone" id="drop-zone">
+            <input type="file"
+                   name="collection_file"
+                   id="file-input"
+                   accept=".json"
+                   style="display:none">
+            <div class="drop-icon">📂</div>
+            <div class="drop-title" id="drop-title">
+                Drag & drop your JSON file here
+            </div>
+            <div class="drop-sub">or</div>
+            <button type="button"
+                    class="btn btn-secondary"
+                    onclick="document.getElementById('file-input').click()">
+                Browse file
+            </button>
+            <div class="drop-hint">Only .json files · max 1MB</div>
+        </div>
+
+        <button type="submit"
+                class="btn btn-primary btn-large"
+                id="submit-btn"
+                style="width:100%;margin-top:16px;display:none">
+            ⬆ Import collection
+        </button>
+    </form>
+
+    <!-- Пример формата -->
+    <div class="card" style="margin-top:32px">
+        <div class="chart-title">Expected file format</div>
+        <pre class="code-block">{
+  "collection": {
+    "name": "Verbes du quotidien",
+    "description": "Повседневные глаголы"
+  },
+  "words": [
+    {
+      "word": "écouter",
+      "translation": "слушать",
+      "transcription": "/e.ku.te/",
+      "part_of_speech": "v",
+      "example_sentence": "J'écoute de la musique."
+    }
+  ]
+}</pre>
+        <div style="margin-top:16px">
+            <div class="section-title" style="margin-bottom:8px">Part of speech values</div>
+            <div style="display:flex;flex-wrap:wrap;gap:8px">
+                {% for code, label in pos_choices %}
+                <span style="background:var(--bg-secondary);border:1px solid var(--border);
+                             border-radius:6px;padding:4px 10px;font-size:13px">
+                    <code style="color:var(--accent)">{{ code }}</code>
+                    <span style="color:var(--text-muted)"> — {{ label }}</span>
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Промпт для нейросети -->
+        <div style="margin-top:20px">
+            <div class="section-title" style="margin-bottom:8px">
+                Generate with AI — copy this prompt
+            </div>
+            <div class="prompt-box" id="prompt-box">
+Создай JSON-файл коллекции французских слов на тему "[ТЕМА]".
+Структура строго такая:
+{
+  "collection": {"name": "...", "description": "..."},
+  "words": [
+    {
+      "word": "французское слово",
+      "translation": "перевод на русский",
+      "transcription": "/IPA транскрипция/",
+      "part_of_speech": "n|v|adj|adv|phrase|other",
+      "example_sentence": "Пример предложения на французском"
+    }
+  ]
+}
+Добавь 15 слов. Только JSON, никакого лишнего текста.
+            </div>
+            <button class="btn btn-secondary btn-sm"
+                    style="margin-top:8px"
+                    onclick="copyPrompt()">
+                📋 Copy prompt
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+const dropTitle = document.getElementById('drop-title');
+const submitBtn = document.getElementById('submit-btn');
+
+// Выбор файла через кнопку
+fileInput.addEventListener('change', function() {
+    if (this.files[0]) showFile(this.files[0]);
+});
+
+// Drag & drop
+dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropZone.classList.add('drag-over');
+});
+
+dropZone.addEventListener('dragleave', function() {
+    dropZone.classList.remove('drag-over');
+});
+
+dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file) {
+        // Создаём DataTransfer чтобы подставить файл в input
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        showFile(file);
+    }
+});
+
+function showFile(file) {
+    if (!file.name.endsWith('.json')) {
+        alert('Please select a .json file');
+        return;
+    }
+    dropTitle.textContent = '✓ ' + file.name;
+    dropZone.classList.add('file-selected');
+    submitBtn.style.display = 'block';
+}
+
+function copyPrompt() {
+    const text = document.getElementById('prompt-box').textContent.trim();
+    navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => btn.textContent = '📋 Copy prompt', 2000);
+    });
+}
+</script>
+{% endblock %}

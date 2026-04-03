@@ -7,8 +7,14 @@
         <div class="page-title">Collections</div>
         <div class="page-subtitle">Organize your words into themed groups</div>
     </div>
-    <a href="{% url 'collection_add' %}" class="btn btn-primary">+ New collection</a>
+
+    <div style="display:flex;gap:10px">
+        <a href="{% url 'collection_import' %}" class="btn btn-secondary">⏬ Import JSON</a>
+        <a href="{% url 'collection_add' %}" class="btn btn-primary">+ New collection</a>
+    </div>
 </div>
+
+
 
 {% if collections %}
 <div class="collections-grid">

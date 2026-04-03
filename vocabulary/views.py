@@ -6,6 +6,7 @@ Views приложения vocabulary.
 import json
 import requests
 import re as _re
+from .models import Word
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.http import JsonResponse
@@ -249,6 +250,105 @@ def collection_delete(request, pk):
         messages.success(request, 'Collection deleted.')
     return redirect('collections')
 
+
+def collection_import(request):
+    """
+    Импорт коллекции из JSON-файла.
+    Поддерживает загрузку через форму и drag-and-drop (тот же POST).
+    """
+    if request.method == 'POST':
+        uploaded_file = request.FILES.get('collection_file')
+
+        if not uploaded_file:
+            messages.error(request, 'No file selected.')
+            return redirect('collection_import')
+
+        # Проверяем расширение
+        if not uploaded_file.name.endswith('.json'):
+            messages.error(request, 'Only .json files are supported.')
+            return redirect('collection_import')
+
+        # Проверяем размер (максимум 1MB)
+        if uploaded_file.size > 1024 * 1024:
+            messages.error(request, 'File too large. Max size is 1MB.')
+            return redirect('collection_import')
+
+        try:
+            raw = uploaded_file.read().decode('utf-8')
+            data = json.loads(raw)
+        except (UnicodeDecodeError, json.JSONDecodeError):
+            messages.error(request, 'Invalid JSON file. Check the file format.')
+            return redirect('collection_import')
+
+        # Валидируем структуру
+        if 'collection' not in data or 'words' not in data:
+            messages.error(
+                request,
+                'Wrong file structure. Need "collection" and "words" keys.'
+            )
+            return redirect('collection_import')
+
+        col_data = data['collection']
+        words_data = data['words']
+
+        if not isinstance(words_data, list) or len(words_data) == 0:
+            messages.error(request, 'Words list is empty.')
+            return redirect('collection_import')
+
+        # Допустимые значения part_of_speech
+        VALID_POS = {'n', 'v', 'adj', 'adv', 'phrase', 'other'}
+
+        # Создаём коллекцию
+        collection = Collection.objects.create(
+            name=col_data.get('name', uploaded_file.name),
+            description=col_data.get('description', ''),
+        )
+
+        created = 0
+        skipped = 0
+        errors = []
+
+        for i, w in enumerate(words_data, start=1):
+            word_text = str(w.get('word', '')).strip()
+            translation = str(w.get('translation', '')).strip()
+
+            # Обязательные поля
+            if not word_text or not translation:
+                skipped += 1
+                errors.append(f'Row {i}: missing word or translation')
+                continue
+
+            pos = str(w.get('part_of_speech', 'other')).strip()
+            if pos not in VALID_POS:
+                pos = 'other'
+
+            Word.objects.create(
+                word=word_text,
+                translation=translation,
+                transcription=str(w.get('transcription', '')).strip(),
+                part_of_speech=pos,
+                example_sentence=str(w.get('example_sentence', '')).strip(),
+                collection=collection,
+                mastery_level=0,
+            )
+            created += 1
+
+        msg = f'Collection "{collection.name}" imported: {created} words added.'
+        if skipped:
+            msg += f' {skipped} skipped (check format).'
+        messages.success(request, msg)
+
+        if errors:
+            for err in errors[:3]:  # показываем только первые 3 ошибки
+                messages.warning(request, err)
+
+        return redirect('collection_detail', pk=collection.pk)
+
+    # GET — показываем страницу загрузки
+    return render(request, 'vocabulary/collection_import.html', {
+        'pos_choices': Word.PART_OF_SPEECH_CHOICES,
+    })
+    
 
 # ─────────────────────────────────────────────
 # PROGRESS
