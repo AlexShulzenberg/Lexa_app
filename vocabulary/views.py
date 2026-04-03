@@ -7,6 +7,7 @@ import json
 import requests
 import re as _re
 from .models import Word
+from django.db.models import Sum
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
 from django.http import JsonResponse
@@ -359,24 +360,34 @@ def progress(request):
     Страница Progress.
     Собирает статистику и передаёт данные для графиков в Chart.js.
     """
+    from django.db.models import Sum
+
     total = Word.objects.count()
     new_count = Word.objects.filter(mastery_level__lt=30).count()
-    learning_count = Word.objects.filter(mastery_level__gte=30, mastery_level__lt=60).count()
-    familiar_count = Word.objects.filter(mastery_level__gte=60, mastery_level__lt=90).count()
+    learning_count = Word.objects.filter(
+        mastery_level__gte=30, mastery_level__lt=60
+    ).count()
+    familiar_count = Word.objects.filter(
+        mastery_level__gte=60, mastery_level__lt=90
+    ).count()
     mastered_count = Word.objects.filter(mastery_level__gte=90).count()
     streak = DailyStreak.get_current_streak()
 
-    # Данные для графика активности (последние 7 дней)
-    sessions = LessonSession.objects.order_by('date')[:14]
-    chart_labels = [str(s.date) for s in sessions]
-    chart_new = [s.words_new for s in sessions]
-    chart_reviewed = [s.words_reviewed for s in sessions]
+    # Агрегируем сессии по датам — суммируем если несколько за день
+    sessions_by_date = (
+        LessonSession.objects
+        .values('date')
+        .annotate(
+            total_new=Sum('words_new'),
+            total_reviewed=Sum('words_reviewed')
+        )
+        .order_by('date')[:14]
+    )
 
-    # Передаём как JSON чтобы Chart.js мог прочитать
     chart_data = {
-        'labels': chart_labels,
-        'new_words': chart_new,
-        'reviewed_words': chart_reviewed,
+        'labels': [str(s['date']) for s in sessions_by_date],
+        'new_words': [s['total_new'] for s in sessions_by_date],
+        'reviewed_words': [s['total_reviewed'] for s in sessions_by_date],
     }
 
     recent_words = Word.objects.exclude(
@@ -390,7 +401,7 @@ def progress(request):
         'familiar_count': familiar_count,
         'mastered_count': mastered_count,
         'streak': streak,
-        'chart_data_json': json.dumps(chart_data),
+        'chart_data': chart_data,
         'recent_words': recent_words,
     }
     return render(request, 'vocabulary/progress.html', context)

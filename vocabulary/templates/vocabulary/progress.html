@@ -118,42 +118,68 @@
 {% endblock %}
 
 {% block extra_js %}
-<script id="chart-data" type="application/json">{{ chart_data_json }}</script>
+{{ chart_data|json_script:"chart-data" }}
 <script>
-const rawData = JSON.parse(document.getElementById('chart-data').textContent);
+document.addEventListener('DOMContentLoaded', function () {
+    const rawData = JSON.parse(
+        document.getElementById('chart-data').textContent
+    );
 
-const ctx = document.getElementById('activityChart').getContext('2d');
-new Chart(ctx, {
-    type: 'bar',
-    data: {
-        labels: rawData.labels.length ? rawData.labels : ['No data yet'],
-        datasets: [
-            {
-                label: 'New words',
-                data: rawData.new_words.length ? rawData.new_words : [0],
-                backgroundColor: 'rgba(79, 110, 247, 0.7)',
-                borderRadius: 4,
-            },
-            {
-                label: 'Reviewed',
-                data: rawData.reviewed_words.length ? rawData.reviewed_words : [0],
-                backgroundColor: 'rgba(62, 207, 142, 0.6)',
-                borderRadius: 4,
-            }
-        ]
-    },
-    options: {
-        responsive: true,
-        plugins: {
-            legend: {
-                labels: { color: '#8b90a7' }
-            }
+    const labels = rawData.labels || [];
+    const newWords = rawData.new_words || [];
+    const reviewed = rawData.reviewed_words || [];
+
+    const ctx = document.getElementById('activityChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels.length ? labels : ['No data yet'],
+            datasets: [
+                {
+                    label: 'New words',
+                    data: newWords.length ? newWords : [0],
+                    borderColor: 'rgba(79, 110, 247, 1)',
+                    backgroundColor: 'rgba(79, 110, 247, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgba(79, 110, 247, 1)',
+                    pointRadius: 5,
+                    tension: 0.4,
+                    fill: true,
+                },
+                {
+                    label: 'Reviewed',
+                    data: reviewed.length ? reviewed : [0],
+                    borderColor: 'rgba(62, 207, 142, 1)',
+                    backgroundColor: 'rgba(62, 207, 142, 0.1)',
+                    borderWidth: 2,
+                    pointBackgroundColor: 'rgba(62, 207, 142, 1)',
+                    pointRadius: 5,
+                    tension: 0.4,
+                    fill: true,
+                }
+            ]
         },
-        scales: {
-            x: { ticks: { color: '#8b90a7' }, grid: { color: '#2a2d3e' } },
-            y: { ticks: { color: '#8b90a7' }, grid: { color: '#2a2d3e' } }
+        options: {
+            responsive: true,
+            maintainAspectRatio: true,
+            plugins: {
+                legend: {
+                    labels: { color: '#8b90a7', padding: 20 }
+                }
+            },
+            scales: {
+                x: {
+                    ticks: { color: '#8b90a7' },
+                    grid: { color: '#2a2d3e' }
+                },
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#8b90a7', stepSize: 1 },
+                    grid: { color: '#2a2d3e' }
+                }
+            }
         }
-    }
+    });
 });
 </script>
 {% endblock %}
