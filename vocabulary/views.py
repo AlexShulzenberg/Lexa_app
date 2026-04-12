@@ -755,3 +755,99 @@ def translate_word(request):
         # Это выведет полную ошибку в консоль VS Code (черное окно внизу)
         print(f"--- Gemini Error: {e} ---") 
         return JsonResponse({'error': str(e)}, status=500)
+    
+
+# ─────────────────────────────────────────────
+# API ДЛЯ УПРАВЛЕНИЯ ОЧЕРЕДЬЮ
+# ─────────────────────────────────────────────
+
+def api_queue_reorder(request):
+    """
+    AJAX: принимает новый порядок слов и сохраняет queue_order.
+    Ожидает POST с JSON: {"order": [id1, id2, id3, ...]}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    try:
+        data = json.loads(request.body)
+        order = data.get('order', [])
+        for position, word_id in enumerate(order):
+            Word.objects.filter(pk=word_id).update(queue_order=position)
+        return JsonResponse({'ok': True})
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=400)
+
+
+def api_queue_remove(request, pk):
+    """AJAX: удаляет слово из системы полностью."""
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    word = get_object_or_404(Word, pk=pk)
+    word.delete()
+    return JsonResponse({'ok': True})
+
+
+def api_queue_postpone(request, pk):
+    """
+    AJAX: откладывает слово — перемещает вниз очереди
+    путём увеличения queue_order на большое число.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    word = get_object_or_404(Word, pk=pk)
+    word.queue_order = word.queue_order + 1000
+    word.save()
+    return JsonResponse({'ok': True})
+
+
+def api_words_batch_add(request):
+    """
+    AJAX: принимает список слов от AI-анализа и сохраняет их в БД.
+    Ожидает POST с JSON:
+    {
+      "collection_id": 1,  // или null для новой
+      "collection_name": "Новая коллекция",
+      "words": [{word, translation, transcription, part_of_speech, example_sentence}, ...]
+    }
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+    try:
+        data = json.loads(request.body)
+        words_data = data.get('words', [])
+        collection_id = data.get('collection_id')
+        collection_name = data.get('collection_name', 'Imported')
+
+        if collection_id:
+            collection = get_object_or_404(Collection, pk=collection_id)
+        else:
+            collection = Collection.objects.create(
+                name=collection_name,
+                description='Imported via AI text analysis'
+            )
+
+        VALID_POS = {'n', 'v', 'adj', 'adv', 'phrase', 'other'}
+        created = 0
+        for w in words_data:
+            pos = w.get('part_of_speech', 'other')
+            if pos not in VALID_POS:
+                pos = 'other'
+            Word.objects.create(
+                word=str(w.get('word', '')).strip(),
+                translation=str(w.get('translation', '')).strip(),
+                transcription=str(w.get('transcription', '')).strip(),
+                part_of_speech=pos,
+                example_sentence=str(w.get('example_sentence', '')).strip(),
+                collection=collection,
+                mastery_level=0,
+            )
+            created += 1
+
+        return JsonResponse({
+            'ok': True,
+            'created': created,
+            'collection_id': collection.pk,
+            'collection_name': collection.name,
+        })
+    except Exception as exc:
+        return JsonResponse({'error': str(exc)}, status=400)

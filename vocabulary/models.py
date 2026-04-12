@@ -89,6 +89,9 @@ class Word(models.Model):
     last_reviewed = models.DateTimeField(null=True, blank=True)
     # null=True потому что новое слово ещё ни разу не повторялось.
 
+    queue_order = models.IntegerField(default=0)
+    # Порядок слова в очереди изучения. Меньше = раньше показывается.
+
     def __str__(self):
         return f"{self.word} — {self.translation}"
 

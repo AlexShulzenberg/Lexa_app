@@ -37,4 +37,10 @@ urlpatterns = [
 
     # --- API для перевода (вызывается из JS) ---
     path('api/translate/', views.translate_word, name='translate_word'),
+
+    # --- API для очереди ---
+    path('api/queue/reorder/', views.api_queue_reorder, name='api_queue_reorder'),
+    path('api/queue/remove/<int:pk>/', views.api_queue_remove, name='api_queue_remove'),
+    path('api/queue/postpone/<int:pk>/', views.api_queue_postpone, name='api_queue_postpone'),
+    path('api/words/batch-add/', views.api_words_batch_add, name='api_words_batch_add'),
 ]
