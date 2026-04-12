@@ -57,12 +57,12 @@ def home(request):
 def vocabulary_list(request):
     """
     Страница Vocabulary.
-    Список всех слов с фильтрацией по уровню и коллекции.
+    Показывает только слова, которые пользователь уже встречал в уроке
+    (last_reviewed не пустое). Слова добавляются здесь только через урок.
     """
-    words = Word.objects.all()
+    words = Word.objects.filter(last_reviewed__isnull=False)
     collections = Collection.objects.all()
 
-    # Фильтры из GET-параметров (?mastery=new&collection=1)
     mastery_filter = request.GET.get('mastery', '')
     collection_filter = request.GET.get('collection', '')
     search_query = request.GET.get('search', '')
@@ -81,7 +81,6 @@ def vocabulary_list(request):
 
     if search_query:
         words = words.filter(word__icontains=search_query)
-        # icontains = поиск без учёта регистра, частичное совпадение
 
     context = {
         'words': words,
@@ -91,7 +90,6 @@ def vocabulary_list(request):
         'search_query': search_query,
     }
     return render(request, 'vocabulary/vocabulary.html', context)
-
 
 # ─────────────────────────────────────────────
 # WORD CRUD
