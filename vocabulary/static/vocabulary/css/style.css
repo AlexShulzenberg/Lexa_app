@@ -1075,6 +1075,13 @@ a {
     pointer-events: none;
 }
 
+.match-btn.wrong {
+    border-color: var(--danger) !important;
+    background: rgba(240, 82, 82, 0.25) !important;
+    color: var(--danger) !important;
+    transition: background 0.1s, border-color 0.1s;
+}
+
 /* ─── FEEDBACK ───────────────────────────────────────── */
 .feedback-card {
     border-radius: 20px;

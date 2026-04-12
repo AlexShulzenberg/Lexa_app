@@ -194,37 +194,80 @@ function selectChoice(btn, wordId) {
 // ── Тип 4: matching ───────────────────────────────────
 let selectedFr = null;
 let selectedRu = null;
-const pairs = {};  // {fr_id: ru_id}
+const pairs = {};
+let mistakes = 0;
+const MAX_MISTAKES = 1;
+let locked = false; // блокируем клики пока показываем результат пары
 
 function selectMatch(btn, side) {
-  if (side === 'fr') {
-    document.querySelectorAll('.match-fr').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedFr = btn.dataset.id;
-  } else {
-    document.querySelectorAll('.match-ru').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    selectedRu = btn.dataset.id;
-  }
+    if (locked) return;
+    if (btn.classList.contains('matched')) return;
 
-  if (selectedFr && selectedRu) {
-    // Создаём пару
-    pairs[selectedFr] = selectedRu;
-
-    // Подсвечиваем совпадение
-    document.querySelector(`.match-fr[data-id="${selectedFr}"]`).classList.add('matched');
-    document.querySelector(`.match-ru[data-id="${selectedRu}"]`).classList.add('matched');
-
-    selectedFr = null;
-    selectedRu = null;
-
-    // Если все пары собраны — активируем кнопку
-    const totalPairs = document.querySelectorAll('.match-fr').length;
-    if (Object.keys(pairs).length >= totalPairs) {
-      document.getElementById('matching-answer').value = JSON.stringify(pairs);
-      document.getElementById('matching-submit').disabled = false;
+    if (side === 'fr') {
+        document.querySelectorAll('.match-fr:not(.matched)').forEach(b => {
+            b.classList.remove('active');
+        });
+        btn.classList.add('active');
+        selectedFr = btn.dataset.id;
+    } else {
+        document.querySelectorAll('.match-ru:not(.matched)').forEach(b => {
+            b.classList.remove('active');
+        });
+        btn.classList.add('active');
+        selectedRu = btn.dataset.id;
     }
-  }
+
+    if (selectedFr && selectedRu) {
+        locked = true; // блокируем новые клики на время анимации
+
+        const frBtn = document.querySelector(`.match-fr[data-id="${selectedFr}"]`);
+        const ruBtn = document.querySelector(`.match-ru[data-id="${selectedRu}"]`);
+        const isCorrect = selectedFr === selectedRu;
+
+        // Сначала убираем active у обоих
+        frBtn.classList.remove('active');
+        ruBtn.classList.remove('active');
+
+        if (isCorrect) {
+            // Зелёный — пара совпала
+            frBtn.classList.add('matched');
+            ruBtn.classList.add('matched');
+            pairs[selectedFr] = selectedRu;
+
+            selectedFr = null;
+            selectedRu = null;
+            locked = false;
+
+            const total = document.querySelectorAll('.match-fr').length;
+            if (Object.keys(pairs).length >= total) {
+                document.getElementById('matching-answer').value = JSON.stringify(pairs);
+                setTimeout(() => document.getElementById('matching-form').submit(), 400);
+            }
+
+        } else {
+            // Красный — неправильная пара
+            frBtn.classList.add('wrong');
+            ruBtn.classList.add('wrong');
+            mistakes++;
+
+            if (mistakes > MAX_MISTAKES) {
+                // Второй провал — ждём чуть дольше и отправляем
+                setTimeout(() => {
+                    document.getElementById('matching-answer').value = '{"fail":"true"}';
+                    document.getElementById('matching-form').submit();
+                }, 1000);
+            } else {
+                // Первый провал — показываем красный 900мс потом сбрасываем
+                setTimeout(() => {
+                    frBtn.classList.remove('wrong');
+                    ruBtn.classList.remove('wrong');
+                    selectedFr = null;
+                    selectedRu = null;
+                    locked = false;
+                }, 900);
+            }
+        }
+    }
 }
 </script>
 {% endblock %}

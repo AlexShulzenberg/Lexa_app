@@ -4,7 +4,6 @@ Views приложения vocabulary.
 """
 
 import json
-import requests
 import re as _re
 from .models import Word
 from django.db.models import Sum
@@ -470,8 +469,9 @@ def _build_lesson_steps(new_ids, review_ids, all_words):
         # (проверим позже при сборке)
         available_types.append(4)
 
-        # Берём 2 случайных типа для каждого слова
-        chosen = random.sample(available_types, min(2, len(available_types)))
+        # Берём count случайных типа для каждого слова
+        count = 1
+        chosen = random.sample(available_types, min(count, len(available_types)))
 
         for ex_type in chosen:
             practice_steps.append({
@@ -520,11 +520,11 @@ def lesson_start(request):
 
     review_ids = list(
         Word.objects.filter(mastery_level__gt=0, mastery_level__lt=90)
-        .order_by('last_reviewed')[:8]
+        .order_by('last_reviewed')[:3]
         .values_list('id', flat=True)
     )
     new_ids = list(
-        Word.objects.filter(mastery_level=0)[:5]
+        Word.objects.filter(mastery_level=0)[:3]
         .values_list('id', flat=True)
     )
 
@@ -603,8 +603,11 @@ def lesson_step(request):
             correct_answer = 'all pairs matched'
             try:
                 pairs = json.loads(user_answer)
-                # pairs = {"word_id": "word_id", ...} — id должен совпадать сам с собой
-                correct = all(k == v for k, v in pairs.items())
+                # pairs = {"fr_word_id": "ru_word_id"}
+                # Правильно если каждый fr_id совпадает со своим ru_id
+                correct = all(
+                    str(k) == str(v) for k, v in pairs.items()
+                )
             except (json.JSONDecodeError, AttributeError):
                 correct = False
 
