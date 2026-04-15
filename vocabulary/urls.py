@@ -43,4 +43,8 @@ urlpatterns = [
     path('api/queue/remove/<int:pk>/', views.api_queue_remove, name='api_queue_remove'),
     path('api/queue/postpone/<int:pk>/', views.api_queue_postpone, name='api_queue_postpone'),
     path('api/words/batch-add/', views.api_words_batch_add, name='api_words_batch_add'),
+    path('api/ocr/', views.api_ocr, name='api_ocr'),
+    path('api/ai-analyze/', views.api_ai_analyze, name='api_ai_analyze'),
+    path('api/translate-batch/', views.api_translate_batch, name='api_translate_batch'),
+
 ]

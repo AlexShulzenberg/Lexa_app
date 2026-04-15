@@ -111,6 +111,10 @@ def word_add(request):
         initial = {}
         if from_collection:
             initial['collection'] = from_collection
+        # Предзаполнение из URL (из OCR клика)
+        prefill_word = request.GET.get('word', '')
+        if prefill_word:
+            initial['word'] = prefill_word
         form = WordForm(initial=initial)
 
     return render(request, 'vocabulary/word_form.html', {
@@ -156,10 +160,38 @@ def word_delete(request, pk):
 # ─────────────────────────────────────────────
 
 def collections(request):
-    """Страница Collections. Список всех коллекций."""
+    """
+    Страница Collections — центр управления словами.
+    Три зоны: мои коллекции, очередь изучения, добавление слов.
+    """
     all_collections = Collection.objects.all()
+
+    # Очередь новых слов (ещё не видели в уроке)
+    new_queue = Word.objects.filter(
+        mastery_level=0
+    ).order_by('queue_order', 'created_at')
+
+    # Очередь повторения (видели, но не выучили полностью)
+    review_queue = Word.objects.filter(
+        mastery_level__gt=0,
+        mastery_level__lt=100
+    ).order_by('queue_order', 'last_reviewed')
+
+    # Форма добавления слова (inline)
+    if request.method == 'POST' and request.POST.get('form_type') == 'quick_add':
+        form = WordForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Word added to queue!')
+            return redirect('collections')
+    else:
+        form = WordForm()
+
     context = {
         'collections': all_collections,
+        'new_queue': new_queue,
+        'review_queue': review_queue,
+        'form': form,
     }
     return render(request, 'vocabulary/collections.html', context)
 
@@ -851,3 +883,226 @@ def api_words_batch_add(request):
         })
     except Exception as exc:
         return JsonResponse({'error': str(exc)}, status=400)
+    
+
+# ─────────────────────────────────────────────
+# API: OCR ЧЕРЕЗ GEMINI VISION
+# ─────────────────────────────────────────────
+
+def api_ocr(request):
+    """
+    OCR через OCR.space API — бесплатно, 25000 запросов/месяц.
+    Хорошо читает текст на фотографиях книг.
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        import base64
+        import urllib.request
+        import urllib.parse
+
+        data = json.loads(request.body)
+        image_data = data.get('image', '')
+
+        if not image_data:
+            return JsonResponse({'error': 'No image provided'}, status=400)
+
+        api_key = getattr(settings, 'OCR_SPACE_API_KEY', None)
+        if not api_key:
+            return JsonResponse({'error': 'OCR_SPACE_API_KEY missing in settings'}, status=500)
+
+        # Отправляем base64 напрямую в OCR.space
+        payload = urllib.parse.urlencode({
+            'base64Image': image_data,   # сюда идёт data:image/jpeg;base64,....
+            'language': 'fre',           # французский язык
+            'isOverlayRequired': 'false',
+            'detectOrientation': 'true',
+            'scale': 'true',             # улучшает качество для фото
+            'OCREngine': '2',            # Engine 2 лучше для книг
+            'apikey': api_key,
+        }).encode('utf-8')
+
+        req = urllib.request.Request(
+            'https://api.ocr.space/parse/image',
+            data=payload,
+            method='POST'
+        )
+
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            result = json.loads(resp.read().decode('utf-8'))
+
+        # Логируем для диагностики
+        print('=== OCR.space result ===')
+        print(json.dumps(result, indent=2)[:500])
+        print('========================')
+
+        # Проверяем ошибки от OCR.space
+        if result.get('IsErroredOnProcessing'):
+            error_msg = result.get('ErrorMessage', ['Unknown error'])
+            if isinstance(error_msg, list):
+                error_msg = error_msg[0]
+            return JsonResponse({'error': f'OCR error: {error_msg}'}, status=422)
+
+        # Извлекаем текст из всех страниц
+        parsed_results = result.get('ParsedResults', [])
+        if not parsed_results:
+            return JsonResponse({'error': 'No text found in image'}, status=422)
+
+        full_text = '\n'.join(
+            page.get('ParsedText', '')
+            for page in parsed_results
+        ).strip()
+
+        print(f'=== Extracted {len(full_text)} chars ===')
+        print(full_text[:300])
+
+        if not full_text:
+            return JsonResponse({'error': 'No text found. Try a clearer image.'}, status=422)
+
+        return JsonResponse({'text': full_text})
+
+    except Exception as e:
+        import traceback
+        print('=== OCR Error ===')
+        print(traceback.format_exc())
+        print('=================')
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+# ─────────────────────────────────────────────
+# API: AI АНАЛИЗ ТЕКСТА ЧЕРЕЗ GEMINI
+# ─────────────────────────────────────────────
+
+def api_ai_analyze(request):
+    """
+    AI анализ текста — извлекает французские слова для изучения.
+    Принимает POST с текстом и уровнем.
+    Не требует авторизации на сторонних сервисах.
+    """
+      
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        text = data.get('text', '').strip()
+        level = data.get('level', 'intermediate')
+
+        if not text:
+            return JsonResponse({'error': 'No text provided'}, status=400)
+
+        api_key = getattr(settings, 'GEMINI_API_KEY', None)
+        if not api_key:
+            return JsonResponse({'error': 'Gemini API key missing'}, status=500)
+
+        level_labels = {
+            'beginner':     'A1-A2 (beginner)',
+            'intermediate': 'B1-B2 (intermediate)',
+            'advanced':     'C1-C2 (advanced)',
+        }
+        level_label = level_labels.get(level, 'B1-B2 (intermediate)')
+
+        client = genai.Client(api_key=api_key)
+
+        prompt = f"""You are a French language teacher creating vocabulary lists.
+Analyze this French text and extract words suitable for {level_label} learners.
+Select only real French words (not proper nouns, not numbers).
+Extract up to 10 most useful words.
+Return ONLY a valid JSON array with no other text, markdown or explanation:
+[
+  {{
+    "word": "french word in infinitive/base form",
+    "translation": "Russian translation",
+    "transcription": "/IPA transcription/",
+    "part_of_speech": "n or v or adj or adv or phrase or other",
+    "example_sentence": "Short example sentence using this word"
+  }}
+]
+
+Text to analyze:
+{text[:1500]}"""
+
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type='application/json',
+            ),
+        )
+
+        result = json.loads(response.text)
+
+        # Gemini иногда возвращает dict вместо list
+        if isinstance(result, dict):
+            result = result.get('words', [])
+
+        return JsonResponse({'words': result})
+
+    except Exception as e:
+        error_str = str(e)
+
+        if '429' in error_str or 'RESOURCE_EXHAUSTED' in error_str:
+            return JsonResponse({
+                'error': 'AI limit reached. Please try again in a few minutes.'
+            }, status=429)
+
+        return JsonResponse({'error': error_str}, status=500)
+
+def api_translate_batch(request):
+    """
+    Переводит список слов одним запросом к Gemini.
+    Принимает: {"words": ["mot", "livre", "grand", ...]}
+    Возвращает: {"translations": {"mot": "слово", "livre": "книга", ...}}
+    """
+    if request.method != 'POST':
+        return JsonResponse({'error': 'POST required'}, status=405)
+
+    try:
+        data = json.loads(request.body)
+        words = data.get('words', [])
+
+        if not words:
+            return JsonResponse({'translations': {}})
+
+        # Ограничиваем количество слов
+        words = words[:100]
+
+        api_key = getattr(settings, 'GEMINI_API_KEY', None)
+        if not api_key:
+            return JsonResponse({'error': 'Gemini API key missing'}, status=500)
+
+        client = genai.Client(api_key=api_key)
+
+        words_list = '\n'.join(f'- {w}' for w in words)
+
+        prompt = f"""Translate these French words to Russian.
+Return ONLY a valid JSON object where key=French word, value=Russian translation.
+Keep keys exactly as given (lowercase).
+Example: {{"mot": "слово", "grand": "большой"}}
+
+Words to translate:
+{words_list}"""
+
+        response = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type='application/json',
+            ),
+        )
+
+        translations = json.loads(response.text)
+
+        # Убеждаемся что это словарь
+        if not isinstance(translations, dict):
+            translations = {}
+
+        print(f'=== Batch translated {len(translations)} words ===')
+
+        return JsonResponse({'translations': translations})
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return JsonResponse({'error': str(e)}, status=500)

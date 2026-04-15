@@ -3,52 +3,886 @@
 
 {% block content %}
 <div class="page-header">
-    <div>
-        <div class="page-title">Collections</div>
-        <div class="page-subtitle">Organize your words into themed groups</div>
-    </div>
-
+    <div class="page-title">Collections</div>
     <div style="display:flex;gap:10px">
-        <a href="{% url 'collection_import' %}" class="btn btn-secondary">⏬ Import JSON</a>
+        <a href="{% url 'collection_import' %}" class="btn btn-secondary">⬆ Import JSON</a>
         <a href="{% url 'collection_add' %}" class="btn btn-primary">+ New collection</a>
     </div>
 </div>
 
+<div class="collections-layout">
 
+    <!-- ═══ КОЛОНКА 1: МОИ КОЛЛЕКЦИИ ═══ -->
+    <div class="col-collections">
+        <div class="col-title">My Collections</div>
 
-{% if collections %}
-<div class="collections-grid">
-    {% for col in collections %}
-    <div class="collection-card">
-        <div class="collection-name">{{ col.name }}</div>
-        {% if col.description %}
-        <div class="collection-desc">{{ col.description }}</div>
+        {% if collections %}
+            <div class="my-collections-list">
+            {% for col in collections %}
+            <div class="my-col-card">
+                <div class="my-col-header">
+                    <div>
+                        <div class="my-col-name">{{ col.name }}</div>
+                        <div class="my-col-meta">
+                            {{ col.word_count }} words · {{ col.mastery_percent }}% mastered
+                        </div>
+                    </div>
+                    <div class="my-col-actions">
+                        <a href="{% url 'collection_edit' col.pk %}"
+                           class="icon-btn" title="Edit">✎</a>
+                        <form method="post" action="{% url 'collection_delete' col.pk %}"
+                              style="display:inline"
+                              onsubmit="return confirm('Delete {{ col.name }}?')">
+                            {% csrf_token %}
+                            <button type="submit" class="icon-btn danger" title="Delete">✕</button>
+                        </form>
+                    </div>
+                </div>
+                <div class="progress-bar-wrap" style="margin:8px 0">
+                    <div class="progress-bar-fill" style="width:{{ col.mastery_percent }}%"></div>
+                </div>
+                <a href="{% url 'collection_detail' col.pk %}"
+                   class="btn btn-secondary btn-sm" style="width:100%;justify-content:center">
+                    Open →
+                </a>
+            </div>
+            {% endfor %}
+            </div>
+        {% else %}
+            <div class="empty-state" style="padding:32px 0">
+                <div class="empty-icon">🗂</div>
+                <div class="empty-text">No collections yet</div>
+                <a href="{% url 'collection_add' %}" class="btn btn-primary" style="margin-top:12px">
+                    + Create first
+                </a>
+            </div>
         {% endif %}
-        <div class="collection-stats">
-            <span>📚 {{ col.word_count }} words</span>
-            <span>📊 {{ col.mastery_percent }}% mastered</span>
+    </div>
+
+    <!-- ═══ КОЛОНКА 2: ОЧЕРЕДЬ ИЗУЧЕНИЯ ═══ -->
+    <div class="col-queue">
+        <div class="col-title">Learning Queue</div>
+
+        <!-- Вкладки -->
+        <div class="queue-tabs">
+            <button class="queue-tab active" onclick="switchTab(this,'new-queue')">
+                New words
+                <span class="queue-count">{{ new_queue.count }}</span>
+            </button>
+            <button class="queue-tab" onclick="switchTab(this,'review-queue')">
+                To review
+                <span class="queue-count">{{ review_queue.count }}</span>
+            </button>
         </div>
-        <div class="progress-bar-wrap" style="margin-bottom:16px">
-            <div class="progress-bar-fill" style="width: {{ col.mastery_percent }}%"></div>
+
+        <!-- Очередь новых слов -->
+        <div id="new-queue" class="queue-list">
+            {% if new_queue %}
+                {% for word in new_queue %}
+                <div class="queue-item" draggable="true" data-id="{{ word.pk }}">
+                    <div class="drag-handle">⠿</div>
+                    <div class="queue-word-info">
+                        <div class="queue-word">{{ word.word }}</div>
+                        <div class="queue-translation">{{ word.translation }}</div>
+                    </div>
+                    {% if word.collection %}
+                    <div class="queue-collection-tag">{{ word.collection.name }}</div>
+                    {% endif %}
+                    <div class="queue-item-actions">
+                        <button class="icon-btn"
+                                onclick="postponeWord({{ word.pk }}, this)"
+                                title="Postpone (move down)">⏬</button>
+                        <button class="icon-btn danger"
+                                onclick="removeWord({{ word.pk }}, this)"
+                                title="Remove from queue">✕</button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="queue-empty">
+                    No new words in queue.<br>
+                    Add words via collections or the form →
+                </div>
+            {% endif %}
         </div>
-        <div class="collection-actions">
-            <a href="{% url 'collection_detail' col.pk %}" class="btn btn-primary btn-sm">Open</a>
-            <a href="{% url 'collection_edit' col.pk %}" class="btn btn-secondary btn-sm">Edit</a>
-            <form method="post" action="{% url 'collection_delete' col.pk %}"
-                  onsubmit="return confirm('Delete collection {{ col.name }}?')">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-            </form>
+
+        <!-- Очередь повторения -->
+        <div id="review-queue" class="queue-list" style="display:none">
+            {% if review_queue %}
+                {% for word in review_queue %}
+                <div class="queue-item" draggable="true" data-id="{{ word.pk }}">
+                    <div class="drag-handle">⠿</div>
+                    <div class="queue-word-info">
+                        <div class="queue-word">{{ word.word }}</div>
+                        <div class="queue-translation">{{ word.translation }}</div>
+                    </div>
+                    <span class="mastery-badge {{ word.mastery_color }}">
+                        {{ word.mastery_level }}%
+                    </span>
+                    <div class="queue-item-actions">
+                        <button class="icon-btn"
+                                onclick="postponeWord({{ word.pk }}, this)"
+                                title="Postpone">⏬</button>
+                        <button class="icon-btn danger"
+                                onclick="removeWord({{ word.pk }}, this)"
+                                title="Remove">✕</button>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="queue-empty">
+                    No words to review yet.<br>Complete some lessons first.
+                </div>
+            {% endif %}
         </div>
     </div>
-    {% endfor %}
+
+    <!-- ═══ КОЛОНКА 3: ДОБАВЛЕНИЕ СЛОВ + OCR ═══ -->
+    <div class="col-add">
+
+        <!-- Быстрое добавление слова -->
+        <div class="col-title">Add word manually</div>
+        <div class="quick-add-card">
+            <form method="post">
+                {% csrf_token %}
+                <input type="hidden" name="form_type" value="quick_add">
+
+                <div style="display:flex;gap:8px;margin-bottom:8px">
+                    <div style="flex:1">
+                        <input type="text"
+                               name="word"
+                               id="qa-word"
+                               class="form-input"
+                               placeholder="French word"
+                               style="width:100%">
+                    </div>
+                    <div style="flex:1">
+                        <input type="text"
+                               name="translation"
+                               id="qa-translation"
+                               class="form-input"
+                               placeholder="Translation">
+                    </div>
+                </div>
+
+                <div style="display:flex;gap:8px;margin-bottom:8px">
+                    <select name="collection" class="form-select" style="flex:1">
+                        <option value="">No collection</option>
+                        {% for col in collections %}
+                        <option value="{{ col.pk }}">{{ col.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button"
+                            class="btn btn-secondary"
+                            onclick="quickAutoTranslate()"
+                            style="white-space:nowrap">
+                        ⚡ Auto
+                    </button>
+                </div>
+
+                <div style="display:flex;gap:8px">
+                    <button type="submit" class="btn btn-primary" style="flex:1">
+                        + Add word
+                    </button>
+                    <a href="{% url 'word_add' %}" class="btn btn-secondary">
+                        Full form
+                    </a>
+                </div>
+            </form>
+        </div>
+
+        <!-- OCR + AI Анализ текста -->
+        <div class="col-title" style="margin-top:24px">
+            Import text from image
+        </div>
+        <div class="ocr-card">
+
+            <!-- Зона загрузки изображения -->
+            <div class="ocr-drop-zone" id="ocr-drop-zone">
+                <input type="file" id="ocr-file-input" accept="image/*" style="display:none">
+                <div id="ocr-placeholder">
+                    <div style="font-size:32px">📷</div>
+                    <div style="font-size:14px;color:var(--text-secondary);margin-top:8px">
+                        Drag image here or
+                    </div>
+                    <button class="btn btn-secondary btn-sm"
+                            style="margin-top:8px"
+                            onclick="document.getElementById('ocr-file-input').click()">
+                        Browse image
+                    </button>
+                </div>
+                <img id="ocr-preview" style="display:none;max-width:100%;border-radius:8px">
+            </div>
+
+            <!-- Кнопка OCR -->
+            <button id="ocr-btn"
+                    class="btn btn-secondary"
+                    style="width:100%;margin-top:10px;display:none"
+                    onclick="runOCR()">
+                🔍 Extract text
+            </button>
+
+            <button id="ocr-clear-btn"
+                    class="btn btn-secondary"
+                    style="width:100%;margin-top:6px;display:none;color:#ff6b6b;border-color:#ff6b6b"
+                    onclick="clearOCR()">
+                🗑 Clear image & text
+            </button>
+
+            <!-- Результат OCR -->
+            <div id="ocr-result-block" style="display:none;margin-top:12px">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:6px;
+                            text-transform:uppercase;letter-spacing:0.5px">
+                    Extracted text
+                    <span style="color:var(--text-muted);font-size:11px">
+                        (click a word to add it)
+                    </span>
+                </div>
+                <div id="ocr-text-display" class="ocr-text-display"></div>
+                <button
+                    onclick="openTextPanel()"
+                    class="btn btn-secondary btn-sm"
+                    style="width:100%; margin-top:8px">
+                    ⤢ Open full text in floating panel
+                </button>
+
+                <!-- AI анализ -->
+                <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+                    <select id="ai-level" class="form-select" style="flex:1;padding:8px">
+                        <option value="beginner">Beginner (A1-A2)</option>
+                        <option value="intermediate" selected>Intermediate (B1-B2)</option>
+                        <option value="advanced">Advanced (C1-C2)</option>
+                    </select>
+                    <button class="btn btn-primary btn-sm"
+                            onclick="runAIAnalysis()"
+                            style="white-space:nowrap">
+                        🤖 Suggest words
+                    </button>
+                </div>
+            </div>
+
+            <!-- AI результаты -->
+            <div id="ai-result-block" style="display:none;margin-top:12px">
+                <div style="font-size:12px;color:var(--text-muted);margin-bottom:8px;
+                            text-transform:uppercase;letter-spacing:0.5px">
+                    Suggested words
+                    <span style="font-size:11px">(uncheck to remove)</span>
+                </div>
+                <div id="ai-words-list" class="ai-words-list"></div>
+
+                <div style="margin-top:12px;display:flex;gap:8px">
+                    <select id="ai-target-collection" class="form-select" style="flex:1;padding:8px">
+                        <option value="new">+ New collection</option>
+                        {% for col in collections %}
+                        <option value="{{ col.pk }}">{{ col.name }}</option>
+                        {% endfor %}
+                    </select>
+                    <button class="btn btn-primary btn-sm"
+                            onclick="addAIWords()"
+                            style="white-space:nowrap">
+                        ✓ Add all
+                    </button>
+                </div>
+            </div>
+
+            <!-- Статус -->
+            <div id="ocr-status" class="ocr-status" style="display:none"></div>
+        </div>
+    </div>
+
 </div>
-{% else %}
-<div class="empty-state">
-    <div class="empty-icon">🗂</div>
-    <div class="empty-text">No collections yet</div>
-    <div class="empty-sub">Create a collection to organize your words by topic</div>
-    <a href="{% url 'collection_add' %}" class="btn btn-primary">+ Create first collection</a>
-</div>
-{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+<script>
+function initCollections() {
+
+const CSRF = '{{ csrf_token }}';
+
+// ══════════════════════════════════════════
+// 1. ПЕРЕМЕННЫЕ — объявляем первыми
+// ══════════════════════════════════════════
+let dragItem         = null;
+let currentImageDataUrl = null;
+let extractedText    = '';
+let wordTranslations = {};
+let aiSuggestedWords = [];
+let tooltipEl        = null;
+
+// Восстанавливаем кэш переводов из localStorage
+const savedTranslations = localStorage.getItem('ocr_translations');
+if (savedTranslations) {
+    try { wordTranslations = JSON.parse(savedTranslations); } catch {}
+}
+
+// ══════════════════════════════════════════
+// 2. ФУНКЦИИ — объявляем до первого вызова
+// ══════════════════════════════════════════
+
+// ── Вкладки очереди ─────────────────────
+function switchTab(btn, tabId) {
+    document.querySelectorAll('.queue-tab').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.queue-list').forEach(l => l.style.display = 'none');
+    btn.classList.add('active');
+    document.getElementById(tabId).style.display = 'block';
+}
+
+// ── Drag & Drop очереди ──────────────────
+function getDragAfterElement(container, y) {
+    const items = [...container.querySelectorAll('.queue-item:not(.dragging)')];
+    return items.reduce((closest, child) => {
+        const box    = child.getBoundingClientRect();
+        const offset = y - box.top - box.height / 2;
+        if (offset < 0 && offset > closest.offset) {
+            return { offset, element: child };
+        }
+        return closest;
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+}
+
+function saveQueueOrder(list) {
+    if (!list) return;
+    const ids = [...list.querySelectorAll('.queue-item')].map(el => el.dataset.id);
+    fetch('/api/queue/reorder/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+        body: JSON.stringify({ order: ids })
+    });
+}
+
+function postponeWord(wordId, btn) {
+    fetch(`/api/queue/postpone/${wordId}/`, {
+        method: 'POST', headers: { 'X-CSRFToken': CSRF }
+    }).then(() => {
+        const item = btn.closest('.queue-item');
+        item.closest('.queue-list').appendChild(item);
+    });
+}
+
+function removeWord(wordId, btn) {
+    if (!confirm('Remove this word?')) return;
+    fetch(`/api/queue/remove/${wordId}/`, {
+        method: 'POST', headers: { 'X-CSRFToken': CSRF }
+    }).then(() => btn.closest('.queue-item').remove());
+}
+
+// ── Быстрый автоперевод ──────────────────
+function quickAutoTranslate() {
+    const word = document.getElementById('qa-word').value.trim();
+    if (!word) { alert('Enter a French word first'); return; }
+    const btn = event.target;
+    btn.textContent = '⏳'; btn.disabled = true;
+    fetch(`/api/translate/?word=${encodeURIComponent(word)}`)
+        .then(r => r.json())
+        .then(data => {
+            if (data.translation)
+                document.getElementById('qa-translation').value = data.translation;
+            if (data.transcription)
+                document.getElementById('qa-transcription').value = data.transcription;
+            if (data.part_of_speech) {
+                const sel = document.querySelector('[name="part_of_speech"]');
+                if (sel) sel.value = data.part_of_speech;
+            }
+            btn.textContent = '✓';
+            setTimeout(() => { btn.textContent = '⚡'; btn.disabled = false; }, 1500);
+        })
+        .catch(() => { btn.textContent = '⚡'; btn.disabled = false; });
+}
+
+// ── Статус ───────────────────────────────
+function showStatus(msg, type) {
+    const el = document.getElementById('ocr-status');
+    el.textContent = msg;
+    el.className   = `ocr-status ocr-status-${type}`;
+    el.style.display = 'block';
+}
+
+// ── Tooltip ──────────────────────────────
+function getTooltip() {
+    if (!tooltipEl) {
+        tooltipEl = document.createElement('div');
+        tooltipEl.id = 'ocr-tooltip';
+        tooltipEl.style.cssText = `
+            position: fixed;
+            background: #2a2a3e;
+            color: #fff;
+            border: 1px solid #555;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 13px;
+            pointer-events: none;
+            z-index: 99999;
+            display: none;
+            max-width: 220px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+            white-space: nowrap;
+        `;
+        document.body.appendChild(tooltipEl);
+    }
+    return tooltipEl;
+}
+
+function showTooltip(word, spanEl) {
+    const tooltip     = getTooltip();
+    const translation = wordTranslations[word.toLowerCase()];
+    tooltip.textContent  = translation || '—';
+    tooltip.style.display = 'block';
+    const rect = spanEl.getBoundingClientRect();
+    tooltip.style.left = rect.left + 'px';
+    tooltip.style.top  = (rect.top - 36) + 'px';
+}
+
+function hideTooltip() {
+    getTooltip().style.display = 'none';
+}
+
+// ── Рендер кликабельного текста ──────────
+function renderClickableTextInto(container, text, translations = {}) {
+    container.innerHTML = '';
+    const tokens = text.split(/(\s+)/);
+    tokens.forEach(token => {
+        const clean = token.replace(/[«»""„\[\](){}.,:;!?0-9]/g, '').trim();
+        if (clean.length > 2) {
+            const span = document.createElement('span');
+            span.className   = 'ocr-word';
+            span.textContent = token.trim();
+            span.style.cursor = 'pointer';
+            if (translations[clean.toLowerCase()]) {
+                span.style.borderBottom = '1px dotted rgba(255,255,255,0.3)';
+            }
+            span.addEventListener('click', () => {
+                document.querySelectorAll('.ocr-word.selected')
+                    .forEach(s => s.classList.remove('selected'));
+                span.classList.add('selected');
+                window.open(`/word/add/?word=${encodeURIComponent(clean)}`, '_blank');
+            });
+            span.addEventListener('mouseenter', () => showTooltip(clean, span));
+            span.addEventListener('mouseleave', hideTooltip);
+            container.appendChild(span);
+            container.appendChild(document.createTextNode(' '));
+        } else {
+            container.appendChild(document.createTextNode(token));
+        }
+    });
+}
+
+function renderClickableText(text) {
+    const container = document.getElementById('ocr-text-display');
+    renderClickableTextInto(container, text, wordTranslations);
+
+    const floatContainer = document.getElementById('ocr-float-text');
+    if (floatContainer) renderClickableTextInto(floatContainer, text, wordTranslations);
+}
+
+// ── Пакетный перевод ─────────────────────
+async function batchTranslateWords(text) {
+    const tokens      = text.split(/\s+/);
+    const uniqueWords = [...new Set(
+        tokens
+            .map(t => t.replace(/[«»""„\[\](){}.,:;!?0-9]/g, '').trim().toLowerCase())
+            .filter(w => w.length > 2)
+    )];
+    const toTranslate = uniqueWords.filter(w => !wordTranslations[w]);
+    if (toTranslate.length === 0) return;
+
+    const statusEl = document.getElementById('panel-translate-status');
+    if (statusEl) {
+        statusEl.style.display = 'block';
+        statusEl.textContent   = `⏳ Translating ${toTranslate.length} words...`;
+    }
+
+    try {
+        const resp = await fetch('/api/translate-batch/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ words: toTranslate })
+        });
+        const data = await resp.json();
+
+        if (data.translations) {
+            Object.assign(wordTranslations, data.translations);
+            localStorage.setItem('ocr_translations', JSON.stringify(wordTranslations));
+        }
+
+        if (statusEl) {
+            statusEl.textContent = `✓ ${Object.keys(wordTranslations).length} words translated`;
+            setTimeout(() => { statusEl.style.display = 'none'; }, 2000);
+        }
+
+        // Перерисовываем с переводами
+        const floatContainer = document.getElementById('ocr-float-text');
+        if (floatContainer) renderClickableTextInto(floatContainer, text, wordTranslations);
+
+    } catch (err) {
+        if (statusEl) {
+            statusEl.textContent = '⚠ Translation failed: ' + err.message;
+            setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
+        }
+    }
+}
+
+// ── Загрузка файла ───────────────────────
+function loadImageFile(file) {
+    const reader = new FileReader();
+    reader.onload = e => {
+        currentImageDataUrl = e.target.result;
+        localStorage.setItem('ocr_image', currentImageDataUrl);
+        localStorage.removeItem('ocr_text');
+        localStorage.removeItem('ocr_translations');
+        wordTranslations = {};
+
+        document.getElementById('ocr-placeholder').style.display = 'none';
+        const img = document.getElementById('ocr-preview');
+        img.src = currentImageDataUrl;
+        img.style.display = 'block';
+        document.getElementById('ocr-btn').style.display       = 'block';
+        document.getElementById('ocr-clear-btn').style.display = 'block'; // ← добавь
+        document.getElementById('ocr-result-block').style.display = 'none';
+        document.getElementById('ai-result-block').style.display  = 'none';
+        document.getElementById('ocr-status').style.display       = 'none';
+        closeTextPanel();
+    };
+    reader.readAsDataURL(file);
+}
+
+// ── OCR запрос ───────────────────────────
+async function runOCR() {
+    if (!currentImageDataUrl) return;
+    const btn = document.getElementById('ocr-btn');
+    btn.disabled    = true;
+    btn.textContent = '⏳ Extracting...';
+    showStatus('🔍 Extracting text...', 'info');
+
+    try {
+        const resp = await fetch('/api/ocr/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ image: currentImageDataUrl })
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) {
+            showStatus('OCR error: ' + data.error, 'error');
+            btn.disabled = false; btn.textContent = '🔍 Extract text';
+            return;
+        }
+
+        extractedText = (data.text || '').trim();
+        if (!extractedText) {
+            showStatus('No text found. Try a clearer image.', 'error');
+            btn.disabled = false; btn.textContent = '🔍 Extract text';
+            return;
+        }
+
+        localStorage.setItem('ocr_text', extractedText);
+        renderClickableText(extractedText);
+        document.getElementById('ocr-result-block').style.display = 'block';
+        showStatus('✓ Text extracted! Click any word to add it, or use AI to suggest words.', 'success');
+
+    } catch (err) {
+        showStatus('Network error: ' + err.message, 'error');
+    }
+
+    btn.disabled = false; btn.textContent = '🔍 Extract text';
+}
+
+// ── Плавающая панель ─────────────────────
+function createTextPanel() {
+    if (document.getElementById('ocr-float-panel')) return;
+
+    const panel = document.createElement('div');
+    panel.id = 'ocr-float-panel';
+    panel.style.cssText = `
+        position: fixed;
+        top: 80px;
+        right: 20px;
+        width: 340px;
+        height: 70vh;
+        min-width: 250px;
+        min-height: 200px;
+        max-width: 90vw;
+        max-height: 90vh;
+        background: var(--card-bg, #1e1e2e);
+        border: 1px solid var(--border, #333);
+        border-radius: 12px;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+        z-index: 9999;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        resize: both;
+    `;
+    panel.innerHTML = `
+        <div id="ocr-panel-header" style="
+            display:flex; justify-content:space-between; align-items:center;
+            padding:12px 16px; border-bottom:1px solid var(--border,#333);
+            cursor:move; user-select:none; flex-shrink:0;">
+            <span style="font-size:13px;font-weight:600;color:var(--text-primary,#fff)">
+                📄 Extracted text
+            </span>
+            <button onclick="closeTextPanel()" style="
+                background:none; border:none; color:var(--text-muted,#888);
+                font-size:18px; cursor:pointer; line-height:1; padding:0 4px;">✕</button>
+        </div>
+        <div id="panel-translate-status" style="
+            display:none; padding:6px 16px; font-size:12px;
+            color:var(--text-muted,#888); background:rgba(255,255,255,0.03);
+            flex-shrink:0; border-bottom:1px solid var(--border,#333);">
+            ⏳ Loading translations...
+        </div>
+        <div id="ocr-float-text" style="
+            padding:16px; overflow-y:auto; flex:1;
+            font-size:14px; line-height:1.9;
+            color:var(--text-primary,#fff); word-break:break-word;">
+        </div>
+        <div style="
+            padding:8px 16px; border-top:1px solid var(--border,#333);
+            font-size:11px; color:var(--text-muted,#888);
+            text-align:center; flex-shrink:0;">
+            Click word to add · Hover for translation · Drag to move · ↘ to resize
+        </div>
+    `;
+    document.body.appendChild(panel);
+    makeDraggable(panel, document.getElementById('ocr-panel-header'));
+}
+
+function clearOCR() {
+    if (!confirm('Clear image and extracted text?')) return;
+
+    // Чистим localStorage
+    localStorage.removeItem('ocr_image');
+    localStorage.removeItem('ocr_text');
+    localStorage.removeItem('ocr_translations');
+
+    // Сбрасываем переменные
+    currentImageDataUrl = null;
+    extractedText       = '';
+    wordTranslations    = {};
+
+    // Сбрасываем UI
+    document.getElementById('ocr-placeholder').style.display = 'block';
+    document.getElementById('ocr-preview').style.display     = 'none';
+    document.getElementById('ocr-preview').src               = '';
+    document.getElementById('ocr-btn').style.display         = 'none';
+    document.getElementById('ocr-clear-btn').style.display   = 'none';
+    document.getElementById('ocr-result-block').style.display = 'none';
+    document.getElementById('ai-result-block').style.display  = 'none';
+    document.getElementById('ocr-status').style.display       = 'none';
+
+    // Закрываем панель если открыта
+    closeTextPanel();
+
+    // Сбрасываем input чтобы можно было загрузить тот же файл снова
+    document.getElementById('ocr-file-input').value = '';
+}
+window.clearOCR = clearOCR;
+
+function closeTextPanel() {
+    const panel = document.getElementById('ocr-float-panel');
+    if (panel) panel.remove();
+}
+
+function openTextPanel() {
+    createTextPanel();
+    const container = document.getElementById('ocr-float-text');
+    if (container) {
+        renderClickableTextInto(container, extractedText, wordTranslations);
+        if (Object.keys(wordTranslations).length === 0) {
+            batchTranslateWords(extractedText);
+        }
+    }
+}
+
+function makeDraggable(panel, handle) {
+    let startX, startY, startLeft, startTop;
+    handle.addEventListener('mousedown', e => {
+        if (e.target.tagName === 'BUTTON') return;
+        startX = e.clientX; startY = e.clientY;
+        const rect = panel.getBoundingClientRect();
+        startLeft = rect.left; startTop = rect.top;
+
+        function onMove(e) {
+            panel.style.left  = (startLeft + e.clientX - startX) + 'px';
+            panel.style.top   = (startTop  + e.clientY - startY) + 'px';
+            panel.style.right = 'auto';
+        }
+        function onUp() {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('mouseup', onUp);
+        }
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
+    });
+}
+
+// ── AI анализ ────────────────────────────
+async function runAIAnalysis() {
+    if (!extractedText.trim()) {
+        showStatus('Extract text from image first', 'error');
+        return;
+    }
+    const level = document.getElementById('ai-level').value;
+    showStatus('🤖 AI is analyzing text...', 'info');
+
+    try {
+        const resp = await fetch('/api/ai-analyze/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({ text: extractedText, level: level })
+        });
+        const data = await resp.json();
+
+        if (!resp.ok) { showStatus('AI error: ' + data.error, 'error'); return; }
+
+        aiSuggestedWords = data.words || [];
+        if (aiSuggestedWords.length === 0) {
+            showStatus('No suitable words found for this level.', 'error');
+            return;
+        }
+
+        renderAIWords(aiSuggestedWords);
+        document.getElementById('ai-result-block').style.display = 'block';
+        showStatus(`✓ Found ${aiSuggestedWords.length} words. Uncheck any you don't need.`, 'success');
+
+    } catch (err) {
+        showStatus('Network error: ' + err.message, 'error');
+    }
+}
+
+function renderAIWords(words) {
+    const container = document.getElementById('ai-words-list');
+    container.innerHTML = '';
+    words.forEach((w, i) => {
+        const div = document.createElement('div');
+        div.className = 'ai-word-item';
+        div.innerHTML = `
+            <label class="ai-word-label">
+                <input type="checkbox" class="ai-word-check" data-index="${i}" checked>
+                <div class="ai-word-info">
+                    <span class="ai-word-fr">${w.word}</span>
+                    <span class="ai-word-sep">→</span>
+                    <span class="ai-word-ru">${w.translation}</span>
+                    <span class="ai-word-pos">${w.part_of_speech}</span>
+                </div>
+            </label>
+            ${w.transcription
+                ? `<div style="font-size:11px;color:var(--text-muted);padding-left:22px">${w.transcription}</div>`
+                : ''}
+        `;
+        container.appendChild(div);
+    });
+}
+
+async function addAIWords() {
+    const checked      = [...document.querySelectorAll('.ai-word-check:checked')];
+    const selectedWords = checked.map(cb => aiSuggestedWords[parseInt(cb.dataset.index)]);
+    if (selectedWords.length === 0) { showStatus('Select at least one word', 'error'); return; }
+
+    const colValue = document.getElementById('ai-target-collection').value;
+    showStatus('Saving words...', 'info');
+    try {
+        const resp = await fetch('/api/words/batch-add/', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': CSRF },
+            body: JSON.stringify({
+                words: selectedWords,
+                collection_id: colValue === 'new' ? null : parseInt(colValue),
+                collection_name: 'From text analysis'
+            })
+        });
+        const data = await resp.json();
+        if (data.ok) {
+            showStatus(`✓ Added ${data.created} words to "${data.collection_name}"!`, 'success');
+            document.getElementById('ai-result-block').style.display = 'none';
+            setTimeout(() => location.reload(), 1500);
+        } else {
+            showStatus('Error: ' + data.error, 'error');
+        }
+    } catch (err) {
+        showStatus('Network error: ' + err.message, 'error');
+    }
+}
+
+// ══════════════════════════════════════════
+// 3. EVENT LISTENERS
+// ══════════════════════════════════════════
+document.querySelectorAll('.queue-list').forEach(list => {
+    list.addEventListener('dragstart', e => {
+        dragItem = e.target.closest('.queue-item');
+        if (dragItem) dragItem.classList.add('dragging');
+    });
+    list.addEventListener('dragend', () => {
+        if (dragItem) {
+            dragItem.classList.remove('dragging');
+            saveQueueOrder(dragItem.closest('.queue-list'));
+            dragItem = null;
+        }
+    });
+    list.addEventListener('dragover', e => {
+        e.preventDefault();
+        if (!dragItem) return;
+        const afterEl = getDragAfterElement(list, e.clientY);
+        if (afterEl) list.insertBefore(dragItem, afterEl);
+        else list.appendChild(dragItem);
+    });
+});
+
+const ocrDropZone = document.getElementById('ocr-drop-zone');
+const ocrFileInput = document.getElementById('ocr-file-input');
+
+ocrDropZone.addEventListener('dragover', e => {
+    e.preventDefault();
+    ocrDropZone.classList.add('drag-over');
+});
+ocrDropZone.addEventListener('dragleave', () => {
+    ocrDropZone.classList.remove('drag-over');
+});
+ocrDropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    ocrDropZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) loadImageFile(file);
+});
+ocrFileInput.addEventListener('change', function () {
+    if (this.files[0]) loadImageFile(this.files[0]);
+});
+
+// ══════════════════════════════════════════
+// 4. ВОССТАНОВЛЕНИЕ ИЗ localStorage
+// ══════════════════════════════════════════
+const savedImage = localStorage.getItem('ocr_image');
+const savedText  = localStorage.getItem('ocr_text');
+
+if (savedImage && savedText) {
+    currentImageDataUrl = savedImage;
+    extractedText       = savedText;
+
+    document.getElementById('ocr-placeholder').style.display  = 'none';
+    const img = document.getElementById('ocr-preview');
+    img.src = savedImage;
+    img.style.display = 'block';
+    document.getElementById('ocr-btn').style.display           = 'block';
+    document.getElementById('ocr-clear-btn').style.display     = 'block'; // ← добавь
+    renderClickableText(extractedText);
+    document.getElementById('ocr-result-block').style.display  = 'block';
+    showStatus('✓ Previous session restored. Click any word or suggest words.', 'success');
+}
+
+// ══════════════════════════════════════════
+// 5. ЭКСПОРТ В ГЛОБАЛЬНЫЙ SCOPE
+// ══════════════════════════════════════════
+window.switchTab          = switchTab;
+window.postponeWord       = postponeWord;
+window.removeWord         = removeWord;
+window.quickAutoTranslate = quickAutoTranslate;
+window.runOCR             = runOCR;
+window.openTextPanel      = openTextPanel;
+window.closeTextPanel     = closeTextPanel;
+window.runAIAnalysis      = runAIAnalysis;
+window.addAIWords         = addAIWords;
+
+} // ═══ конец initCollections ═══
+
+document.addEventListener('DOMContentLoaded', initCollections);
+</script>
 {% endblock %}

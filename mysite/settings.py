@@ -22,8 +22,9 @@ load_dotenv()
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Теперь безопасно достаем ключ
+# Безопасно достаем ключи
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+OCR_SPACE_API_KEY = os.getenv('OCR_SPACE_API_KEY')
 
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
