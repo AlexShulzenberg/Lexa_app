@@ -5,7 +5,9 @@ Views приложения vocabulary.
 
 import json
 import re as _re
-from .models import Word
+from django.conf import settings
+from google import genai
+from google.genai import types
 from django.db.models import Sum
 from django.shortcuts import render, get_object_or_404, redirect
 from django.contrib import messages
@@ -13,9 +15,7 @@ from django.http import JsonResponse
 from django.utils import timezone
 from .models import Word, Collection, LessonSession, DailyStreak
 from .forms import WordForm, CollectionForm
-from django.conf import settings
-from google import genai
-from google.genai import types
+
 
 
 # ─────────────────────────────────────────────
@@ -389,8 +389,6 @@ def progress(request):
     Страница Progress.
     Собирает статистику и передаёт данные для графиков в Chart.js.
     """
-    from django.db.models import Sum
-
     total = Word.objects.count()
     new_count = Word.objects.filter(mastery_level__lt=30).count()
     learning_count = Word.objects.filter(
@@ -546,8 +544,7 @@ def lesson_start(request):
     Собирает слова для урока и строит очередь упражнений.
     Сохраняет всё в Django-сессии.
     """
-    import random
-
+    
     review_ids = list(
         Word.objects.filter(mastery_level__gt=0, mastery_level__lt=90)
         .order_by('last_reviewed')[:3]
@@ -778,16 +775,14 @@ def translate_word(request):
                 response_mime_type="application/json",
             ),
         )
-        
         result = json.loads(response.text)
         # Теперь в словаре result будет ключ 'example_sentence'
         return JsonResponse(result)
-    
+
     except Exception as e:
         # Это выведет полную ошибку в консоль VS Code (черное окно внизу)
-        print(f"--- Gemini Error: {e} ---") 
+        print(f"--- Gemini Error: {e} ---")
         return JsonResponse({'error': str(e)}, status=500)
-    
 
 # ─────────────────────────────────────────────
 # API ДЛЯ УПРАВЛЕНИЯ ОЧЕРЕДЬЮ
@@ -883,7 +878,7 @@ def api_words_batch_add(request):
         })
     except Exception as exc:
         return JsonResponse({'error': str(exc)}, status=400)
-    
+
 
 # ─────────────────────────────────────────────
 # API: OCR ЧЕРЕЗ GEMINI VISION
@@ -980,7 +975,7 @@ def api_ai_analyze(request):
     Принимает POST с текстом и уровнем.
     Не требует авторизации на сторонних сервисах.
     """
-      
+
     if request.method != 'POST':
         return JsonResponse({'error': 'POST required'}, status=405)
 
